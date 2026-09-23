@@ -554,6 +554,83 @@
     opacity:0; transition:opacity .25s; z-index:60; max-width:88vw; white-space:nowrap;
     overflow:hidden; text-overflow:ellipsis; pointer-events:none;
   }
+
+  /* ==========================================================
+     CAMERA OCR CAPTURE — group-check + floating shutter workflow.
+     Sits beside the voice FAB, same visual language. Which reading
+     groups get scanned is armed via small checkboxes on each table's
+     group headers (grp-check); which unit row they get written into
+     is whichever cell-input the user last tapped (reuses the same
+     lastFocusedInput tracking the voice-entry feature already sets
+     up) — tr:focus-within below gives that row a visible highlight.
+     ========================================================== */
+  .grid tbody tr:focus-within{ outline:2px solid var(--blue); outline-offset:-2px; background:rgba(90,169,230,.07); }
+  .grp-check{
+    display:inline-flex; align-items:center; gap:4px; font-family:var(--font-mono);
+    font-size:9px; font-weight:600; letter-spacing:.3px; text-transform:none;
+    color:var(--text-faint); cursor:pointer; margin-left:6px; vertical-align:middle;
+    padding:2px 5px; border-radius:5px; border:1px dashed var(--border-soft);
+  }
+  .grp-check input{ width:11px; height:11px; margin:0; accent-color:var(--blue); cursor:pointer; }
+  .grp-check.armed{ color:var(--blue); border-color:var(--blue); border-style:solid; background:rgba(90,169,230,.12); }
+  .camera-fab{
+    position:fixed; right:84px; bottom:16px; z-index:60;
+    width:56px; height:56px; border-radius:50%;
+    background:var(--panel-2); border:1px solid var(--border); color:var(--text);
+    font-size:22px; display:flex; align-items:center; justify-content:center;
+    box-shadow:0 6px 20px rgba(0,0,0,.35); cursor:pointer; line-height:1;
+  }
+  .camera-fab:hover{ border-color:var(--text-faint); }
+  .camera-fab.armed{ border-color:var(--blue); color:var(--blue); box-shadow:0 0 0 3px rgba(90,169,230,.18), 0 6px 20px rgba(0,0,0,.35); }
+  .camera-fab-badge{
+    position:absolute; top:-4px; right:-4px; min-width:18px; height:18px; padding:0 4px;
+    border-radius:9px; background:var(--blue); color:#06121c; font-family:var(--font-mono);
+    font-size:10.5px; font-weight:700; display:flex; align-items:center; justify-content:center;
+  }
+  .ocr-overlay{
+    position:fixed; inset:0; z-index:300; background:#04070a;
+    display:flex; flex-direction:column; color:#fff;
+  }
+  .ocr-top{
+    display:flex; align-items:center; gap:10px; padding:12px 14px;
+    background:rgba(10,14,19,.9); border-bottom:1px solid #223;
+  }
+  .ocr-iconbtn{
+    width:34px; height:34px; border-radius:50%; border:1px solid #3a4a5a; background:rgba(255,255,255,.05);
+    color:#fff; font-size:16px; display:flex; align-items:center; justify-content:center; cursor:pointer; flex:none;
+  }
+  .ocr-title{ flex:1; min-width:0; }
+  .ocr-title .grp{ font-family:var(--font-display); font-weight:700; font-size:15px; }
+  .ocr-title .sub{ font-family:var(--font-mono); font-size:10.5px; color:#93a3b2; margin-top:1px; }
+  .ocr-queue-badge{
+    font-family:var(--font-mono); font-size:11px; font-weight:700; color:var(--blue);
+    border:1px solid var(--blue); border-radius:999px; padding:3px 9px; flex:none;
+  }
+  .ocr-camera-wrap{ position:relative; flex:1; min-height:0; overflow:hidden; background:#000; }
+  .ocr-camera-wrap video{ width:100%; height:100%; object-fit:cover; display:block; }
+  .ocr-reticle{
+    position:absolute; left:6%; right:6%; top:32%; bottom:32%;
+    border:2px dashed rgba(90,169,230,.85); border-radius:12px; pointer-events:none;
+    box-shadow:0 0 0 2000px rgba(0,0,0,.32);
+  }
+  .ocr-reticle.locked{ border-color:var(--green); border-style:solid; box-shadow:0 0 0 2000px rgba(0,0,0,.32), 0 0 24px rgba(51,214,144,.5); }
+  .ocr-scanstatus{
+    position:absolute; left:50%; bottom:14px; transform:translateX(-50%);
+    background:rgba(10,14,19,.88); border:1px solid #2a3a4a; color:#fff;
+    font-family:var(--font-mono); font-size:12px; padding:8px 16px; border-radius:999px;
+    white-space:nowrap; max-width:90vw; overflow:hidden; text-overflow:ellipsis;
+  }
+  .ocr-review{
+    background:var(--panel-2); border-top:1px solid var(--border); padding:14px;
+    max-height:46vh; overflow-y:auto;
+  }
+  .ocr-review-hint{ font-family:var(--font-mono); font-size:10.5px; color:var(--green); margin-bottom:10px; }
+  .ocr-review-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(84px,1fr)); gap:8px; }
+  .ocr-review-field{ display:flex; flex-direction:column; gap:4px; align-items:center; }
+  .ocr-review-field label{ font-family:var(--font-mono); font-size:9.5px; color:var(--text-faint); letter-spacing:.5px; text-transform:uppercase; }
+  .ocr-review-field input{ width:100%; text-align:center; color:var(--text); }
+  .ocr-controls{ display:flex; gap:8px; padding:12px 14px; background:var(--panel-2); border-top:1px solid var(--border); }
+  .ocr-controls .btn{ flex:1; justify-content:center; }
   .form-field{ margin-bottom:10px; }
   .form-field label{ display:block; font-size:9.5px; letter-spacing:1.2px; text-transform:uppercase; color:var(--text-faint); font-family:var(--font-mono); margin-bottom:4px; text-align:left; }
   .form-field input{ width:100%; text-align:left; }
@@ -814,6 +891,34 @@
 
 <button id="btnVoice" class="voice-fab no-print" title="Tap a reading field first, then tap here to start voice entry">🎤</button>
 <div id="voiceHeardToast" class="voice-toast no-print"></div>
+
+<button id="btnCamera" class="camera-fab no-print" title="Check a reading group above, tap a field in that row, then tap here to scan">📷<span id="cameraFabBadge" class="camera-fab-badge" style="display:none">0</span></button>
+
+<div id="ocrOverlay" class="ocr-overlay no-print" style="display:none">
+  <div class="ocr-top">
+    <button class="ocr-iconbtn" id="ocrClose" title="Cancel scan">✕</button>
+    <div class="ocr-title">
+      <div class="grp" id="ocrGroupLabel">—</div>
+      <div class="sub" id="ocrGroupSub">—</div>
+    </div>
+    <div class="ocr-queue-badge" id="ocrQueueBadge">1/1</div>
+  </div>
+  <div class="ocr-camera-wrap">
+    <video id="ocrVideo" autoplay playsinline muted></video>
+    <canvas id="ocrCanvas" style="display:none"></canvas>
+    <div class="ocr-reticle" id="ocrReticle"></div>
+    <div class="ocr-scanstatus" id="ocrScanStatus">Starting camera…</div>
+  </div>
+  <div class="ocr-review no-print" id="ocrReview" style="display:none">
+    <div class="ocr-review-hint" id="ocrReviewHint">Check the numbers below, fix anything OCR misread, then confirm.</div>
+    <div class="ocr-review-grid" id="ocrReviewGrid"></div>
+  </div>
+  <div class="ocr-controls">
+    <button class="btn ghost" id="ocrSkipBtn">Skip group</button>
+    <button class="btn primary" id="ocrCaptureBtn">📸 Capture now</button>
+    <button class="btn primary" id="ocrConfirmBtn" style="display:none">✓ Use these values</button>
+  </div>
+</div>
 
 <!-- html2canvas v1.4.1 and jsPDF v2.5.1, embedded directly so PDF export/share
      works fully offline from the very first use -- no CDN fetch required. This is
@@ -1789,6 +1894,20 @@ function statusSelect(path, val){
   </select>`;
 }
 
+/* Small "arm for OCR scan" checkbox rendered inside a table's group
+   header (Input Voltage, UPM, Source 1, etc). Checking it doesn't
+   target a row by itself — see getOcrTargetRow() below, which reuses
+   the same lastFocusedInput tracking the voice-entry feature sets up
+   ("tap a field first"). extraLabel lets one checkbox represent a
+   pair of fields that live on the same physical display (Batt VDC +
+   Runtime) without having to restructure the table's column count. */
+function grpCheck(section, groupKey, extraLabel){
+  const armed = ARMED_GROUPS.has(section+':'+groupKey);
+  return `<label class="grp-check ${armed?'armed':''}" title="Arm this group for camera OCR scan" onclick="event.stopPropagation()">
+    <input type="checkbox" ${armed?'checked':''} onchange="toggleOcrGroup('${section}','${groupKey}',this.checked)">📷${extraLabel||''}
+  </label>`;
+}
+
 function renderUpsTable(roomKey, room){
   const effSpec = getEffectiveSpec(roomKey);
   const rows = room.ups.map((u,i)=>{
@@ -1831,12 +1950,12 @@ function renderUpsTable(roomKey, room){
     <thead>
       <tr class="group">
         <th rowspan="2">Equipment</th>
-        <th colspan="3">Input Voltage (±10%)</th>
-        <th colspan="3">Output Voltage (±10%)</th>
+        <th colspan="3">Input Voltage (±10%)${grpCheck('ups','iv')}</th>
+        <th colspan="3">Output Voltage (±10%)${grpCheck('ups','ov')}</th>
         <th rowspan="2">Load<br>kVA</th>
         <th rowspan="2">Total<br>kVA</th>
-        <th colspan="5">Universal Power Module</th>
-        <th rowspan="2">Batt<br>VDC≈520</th>
+        <th colspan="5">Universal Power Module${grpCheck('ups','upm')}</th>
+        <th rowspan="2">Batt<br>VDC≈520${grpCheck('ups','bvrt','+Runtime')}</th>
         <th rowspan="2">Runtime<br>(min)</th>
         <th rowspan="2">Charge<br>A (max5)</th>
         <th rowspan="2">Room °C<br>(&lt;22)</th>
@@ -1895,10 +2014,10 @@ function renderStsTable(roomKey, room){
     <thead>
       <tr class="group">
         <th rowspan="2">Equipment</th>
-        <th colspan="3">Source 1 (220–240V)</th>
-        <th colspan="3">Source 2 (220–240V)</th>
-        <th colspan="3">Load %</th>
-        <th colspan="3">Input Current</th>
+        <th colspan="3">Source 1 (220–240V)${grpCheck('sts','s1')}</th>
+        <th colspan="3">Source 2 (220–240V)${grpCheck('sts','s2')}</th>
+        <th colspan="3">Load %${grpCheck('sts','lp')}</th>
+        <th colspan="3">Input Current${grpCheck('sts','ic')}</th>
         <th rowspan="2">Temp<br>0–40°C</th>
         <th colspan="2">Freq (±4Hz)</th>
         <th rowspan="2">Time</th>
@@ -2411,10 +2530,307 @@ function stopVoiceEntry(){
 }
 function toggleVoiceEntry(){ voiceListening ? stopVoiceEntry() : startVoiceEntry(); }
 document.getElementById("roomsHost").addEventListener("focusin", (e)=>{
-  if(e.target && e.target.classList && e.target.classList.contains("cell-input")) lastFocusedInput = e.target;
+  if(e.target && e.target.classList && e.target.classList.contains("cell-input")){
+    lastFocusedInput = e.target;
+    updateCameraFabState();
+  }
 });
 document.getElementById("btnVoice").addEventListener("click", toggleVoiceEntry);
 window.toggleVoiceEntry = toggleVoiceEntry;
+
+/* =========================================================
+   CAMERA OCR CAPTURE
+   Which fields to read are armed via small checkboxes on each
+   table's group header (grp-check); which unit row they get
+   written into is whichever cell-input the user last tapped, via
+   the same lastFocusedInput tracking voice-entry above sets up.
+   Tesseract.js is lazy-loaded from a CDN on first scan (not
+   inlined, unlike html2canvas/jsPDF — the language data alone is
+   tens of MB) so, like voice entry, this needs internet the first
+   time it's used even though the rest of the app is fully offline.
+   Values are written by setting the real <input> and dispatching
+   an "input" event, so the existing alarm/spec/audit/trend pipeline
+   runs exactly as if the reading had been typed in by hand.
+   ========================================================= */
+const GROUP_DEFS = {
+  ups: {
+    iv:   { label:"Input Voltage",          sub:"L1 / L2 / L3",   fields:["iv.0","iv.1","iv.2"],                     labels:["L1","L2","L3"] },
+    ov:   { label:"Output Voltage",         sub:"L1 / L2 / L3",   fields:["ov.0","ov.1","ov.2"],                     labels:["L1","L2","L3"] },
+    upm:  { label:"Universal Power Module", sub:"Modules 1–5",    fields:["upm.0","upm.1","upm.2","upm.3","upm.4"],  labels:["1","2","3","4","5"] },
+    bvrt: { label:"Batt VDC + Runtime",     sub:"Battery, then runtime", fields:["bv","rt"],                        labels:["Batt VDC","Runtime min"] }
+  },
+  sts: {
+    s1: { label:"Source 1",      sub:"L1 / L2 / L3", fields:["s1.0","s1.1","s1.2"], labels:["L1","L2","L3"] },
+    s2: { label:"Source 2",      sub:"L1 / L2 / L3", fields:["s2.0","s2.1","s2.2"], labels:["L1","L2","L3"] },
+    lp: { label:"Load %",        sub:"L1 / L2 / L3", fields:["lp.0","lp.1","lp.2"], labels:["L1","L2","L3"] },
+    ic: { label:"Input Current", sub:"L1 / L2 / L3", fields:["ic.0","ic.1","ic.2"], labels:["L1","L2","L3"] }
+  }
+};
+const ARMED_GROUPS = new Set(); // "ups:iv", "sts:s2", ...
+
+function toggleOcrGroup(section, groupKey, on){
+  const key = section+':'+groupKey;
+  if(on) ARMED_GROUPS.add(key); else ARMED_GROUPS.delete(key);
+  renderAll();
+  updateCameraFabState();
+}
+window.toggleOcrGroup = toggleOcrGroup;
+
+function getOcrTargetRow(){
+  if(!lastFocusedInput) return null;
+  const path = lastFocusedInput.getAttribute("data-path");
+  if(!path) return null;
+  const parts = path.split(".");
+  const roomKey = parts[0], section = parts[1], idx = parts[2];
+  if((section!=="ups" && section!=="sts") || !/^\d+$/.test(idx||"")) return null;
+  if(!STATE[roomKey]) return null;
+  const list = STATE[roomKey][section];
+  const i = parseInt(idx,10);
+  if(!list || !list[i]) return null;
+  return { roomKey, section, idx:i, unitName: list[i].n || "(unnamed unit)" };
+}
+
+function updateCameraFabState(){
+  const btn = document.getElementById("btnCamera");
+  const badge = document.getElementById("cameraFabBadge");
+  if(!btn) return;
+  const target = getOcrTargetRow();
+  const count = target ? Array.from(ARMED_GROUPS).filter(k=>k.startsWith(target.section+':')).length : 0;
+  btn.classList.toggle("armed", count>0);
+  if(count>0){ badge.style.display="flex"; badge.textContent=count; }
+  else badge.style.display="none";
+  btn.title = target
+    ? (count>0 ? `Scan ${count} group(s) into ${target.unitName}` : "Check a reading group above to arm it, then tap here")
+    : "Tap a reading field first, then check a group above and tap here to scan";
+}
+
+function loadScriptOnce(src){
+  return new Promise((resolve, reject)=>{
+    if(document.querySelector(`script[data-src="${src}"]`)){ resolve(); return; }
+    const s = document.createElement("script");
+    s.src = src; s.setAttribute("data-src", src);
+    s.onload = ()=>resolve();
+    s.onerror = ()=>reject(new Error("failed to load "+src));
+    document.head.appendChild(s);
+  });
+}
+
+let ocrWorker = null;
+async function ensureOcrEngine(onStatus){
+  if(ocrWorker) return ocrWorker;
+  if(!window.Tesseract){
+    onStatus && onStatus("Loading OCR engine… (needs internet the first time)");
+    await loadScriptOnce("https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js");
+  }
+  onStatus && onStatus("Starting OCR engine…");
+  ocrWorker = await Tesseract.createWorker("eng");
+  await ocrWorker.setParameters({ tessedit_char_whitelist: "0123456789.-" });
+  return ocrWorker;
+}
+
+let ocrStream = null;
+let ocrScanTimer = null;
+let ocrTarget = null;
+let ocrQueue = [];
+let ocrQueueIdx = 0;
+let ocrScanning = false;
+let ocrConfidenceReadings = [];
+let ocrFilledCount = 0;
+
+function openOcrCapture(){
+  const target = getOcrTargetRow();
+  if(!target){
+    showInfoModal("Tap a field first", "Tap any reading in the row/unit you want to capture from, tick which groups above you want scanned, then tap the camera again.");
+    return;
+  }
+  const groups = Array.from(ARMED_GROUPS).filter(k=>k.startsWith(target.section+':')).map(k=>k.split(':')[1]);
+  if(!groups.length){
+    showInfoModal("Check a group first", "Tick the checkbox beside at least one reading group (Input Voltage, UPM, Source 1, etc) above the table, then tap the camera again.");
+    return;
+  }
+  ocrTarget = target;
+  ocrQueue = groups;
+  ocrQueueIdx = 0;
+  ocrFilledCount = 0;
+  document.getElementById("ocrOverlay").style.display = "flex";
+  startOcrGroup();
+}
+window.openOcrCapture = openOcrCapture;
+
+function setOcrStatus(text){
+  const el = document.getElementById("ocrScanStatus");
+  if(el) el.textContent = text;
+}
+
+async function startOcrGroup(){
+  const section = ocrTarget.section;
+  const groupKey = ocrQueue[ocrQueueIdx];
+  const def = GROUP_DEFS[section][groupKey];
+  document.getElementById("ocrGroupLabel").textContent = def.label;
+  document.getElementById("ocrGroupSub").textContent = `${ocrTarget.unitName} · ${def.sub}`;
+  document.getElementById("ocrQueueBadge").textContent = `${ocrQueueIdx+1}/${ocrQueue.length}`;
+  document.getElementById("ocrReview").style.display = "none";
+  document.getElementById("ocrCaptureBtn").style.display = "";
+  document.getElementById("ocrConfirmBtn").style.display = "none";
+  document.getElementById("ocrReticle").classList.remove("locked");
+  setOcrStatus("Point the camera at the display…");
+  ocrConfidenceReadings = [];
+  await ensureOcrCamera();
+  ensureOcrEngine(setOcrStatus).catch(e=>{
+    console.error(e);
+    setOcrStatus("OCR engine failed to load — use Capture now, then type values manually.");
+  });
+  startAutoScanLoop();
+}
+
+async function ensureOcrCamera(){
+  if(ocrStream) return;
+  try{
+    ocrStream = await navigator.mediaDevices.getUserMedia({ video:{ facingMode:{ ideal:"environment" } }, audio:false });
+    document.getElementById("ocrVideo").srcObject = ocrStream;
+  }catch(e){
+    console.error(e);
+    setOcrStatus("Camera unavailable.");
+    showInfoModal("Camera not available", "Couldn't open the camera. On Android Chrome this needs the page served over https:// or localhost — it's blocked from a local file:// page. You can close this and enter the readings by hand instead.");
+  }
+}
+
+function startAutoScanLoop(){
+  stopAutoScanLoop();
+  ocrScanTimer = setInterval(()=>{ attemptAutoScan(); }, 1100);
+}
+function stopAutoScanLoop(){
+  if(ocrScanTimer){ clearInterval(ocrScanTimer); ocrScanTimer=null; }
+}
+
+function grabReticleFrame(){
+  const video = document.getElementById("ocrVideo");
+  const canvas = document.getElementById("ocrCanvas");
+  if(!video.videoWidth) return null;
+  const vw = video.videoWidth, vh = video.videoHeight;
+  const sx = Math.round(vw*0.06), sw = Math.round(vw*0.88);
+  const sy = Math.round(vh*0.32), sh = Math.round(vh*0.36);
+  canvas.width = sw; canvas.height = sh;
+  canvas.getContext("2d").drawImage(video, sx, sy, sw, sh, 0, 0, sw, sh);
+  return canvas;
+}
+
+function extractNumbers(text){
+  const m = text.match(/-?\d+\.?\d*/g);
+  return m ? m.map(parseFloat).filter(n=>!isNaN(n)) : [];
+}
+function readingsAgree(a,b){
+  if(a.length!==b.length) return false;
+  return a.every((v,i)=> Math.abs(v-b[i]) < 0.5);
+}
+
+async function attemptAutoScan(){
+  if(ocrScanning || !ocrWorker) return;
+  const canvas = grabReticleFrame();
+  if(!canvas) return;
+  ocrScanning = true;
+  try{
+    const { data } = await ocrWorker.recognize(canvas);
+    const numbers = extractNumbers(data.text);
+    const def = GROUP_DEFS[ocrTarget.section][ocrQueue[ocrQueueIdx]];
+    const expected = def.fields.length;
+    if(numbers.length === expected){
+      ocrConfidenceReadings.push(numbers);
+      if(ocrConfidenceReadings.length > 2) ocrConfidenceReadings.shift();
+      if(ocrConfidenceReadings.length===2 && readingsAgree(ocrConfidenceReadings[0], ocrConfidenceReadings[1])){
+        lockAndReview(numbers);
+        return;
+      }
+      setOcrStatus(`Found ${numbers.length}/${expected} — hold steady to lock…`);
+    } else if(numbers.length>0){
+      ocrConfidenceReadings = [];
+      setOcrStatus(`Found ${numbers.length}/${expected} numbers — reframe the display`);
+    } else {
+      ocrConfidenceReadings = [];
+      setOcrStatus("Scanning… point squarely at the digits");
+    }
+  }catch(e){ console.error(e); } finally { ocrScanning = false; }
+}
+
+function lockAndReview(numbers){
+  stopAutoScanLoop();
+  document.getElementById("ocrReticle").classList.add("locked");
+  setOcrStatus("Locked — verify below and confirm.");
+  if(navigator.vibrate){ try{ navigator.vibrate(60); }catch(e){} }
+  showOcrReview(numbers);
+}
+
+function showOcrReview(numbers){
+  const section = ocrTarget.section;
+  const def = GROUP_DEFS[section][ocrQueue[ocrQueueIdx]];
+  const grid = document.getElementById("ocrReviewGrid");
+  grid.innerHTML = def.labels.map((label,i)=>{
+    const v = (numbers[i]!==undefined) ? numbers[i] : "";
+    return `<div class="ocr-review-field"><label>${label}</label><input type="number" step="0.1" class="cell-input" data-ocr-idx="${i}" value="${v}"></div>`;
+  }).join("");
+  document.getElementById("ocrReview").style.display = "block";
+  document.getElementById("ocrCaptureBtn").style.display = "none";
+  document.getElementById("ocrConfirmBtn").style.display = "";
+}
+
+function advanceOcrQueue(){
+  ocrQueueIdx++;
+  if(ocrQueueIdx < ocrQueue.length) startOcrGroup();
+  else finishOcrSession();
+}
+
+function finishOcrSession(){
+  const target = ocrTarget, filled = ocrFilledCount, total = ocrQueue.length;
+  closeOcrOverlay();
+  if(filled>0){
+    logAudit(target.roomKey, `OCR-scanned ${filled} reading group(s) into ${target.unitName}.`);
+    showInfoModal("Scan complete", `Filled ${filled} of ${total} group(s) for ${target.unitName}. Double-check the highlighted row before moving on.`);
+  }
+}
+
+function closeOcrOverlay(){
+  stopAutoScanLoop();
+  if(ocrStream){ ocrStream.getTracks().forEach(t=>t.stop()); ocrStream=null; }
+  document.getElementById("ocrOverlay").style.display = "none";
+}
+
+document.getElementById("ocrCaptureBtn").addEventListener("click", async ()=>{
+  const canvas = grabReticleFrame();
+  if(!canvas){ showInfoModal("Camera not ready", "Give the camera a moment to start, then try again."); return; }
+  const btn = document.getElementById("ocrCaptureBtn");
+  const done = setBusy(btn, "⏳ Reading…");
+  try{
+    await ensureOcrEngine(setOcrStatus);
+    const { data } = await ocrWorker.recognize(canvas);
+    stopAutoScanLoop();
+    showOcrReview(extractNumbers(data.text));
+  }catch(e){
+    console.error(e);
+    stopAutoScanLoop();
+    showOcrReview([]);
+  } finally { done(); }
+});
+document.getElementById("ocrConfirmBtn").addEventListener("click", ()=>{
+  const section = ocrTarget.section;
+  const def = GROUP_DEFS[section][ocrQueue[ocrQueueIdx]];
+  const grid = document.getElementById("ocrReviewGrid");
+  let appliedAny = false;
+  def.fields.forEach((fieldSuffix,i)=>{
+    const input = grid.querySelector(`[data-ocr-idx="${i}"]`);
+    const raw = input ? input.value : "";
+    if(raw==="") return;
+    const v = parseFloat(raw);
+    if(isNaN(v)) return;
+    const path = `${ocrTarget.roomKey}.${section}.${ocrTarget.idx}.${fieldSuffix}`;
+    const el = document.querySelector(`[data-path="${path}"]`);
+    if(el){ el.value = v; el.dispatchEvent(new Event("input", {bubbles:true})); appliedAny = true; }
+  });
+  if(appliedAny) ocrFilledCount++;
+  advanceOcrQueue();
+});
+document.getElementById("ocrSkipBtn").addEventListener("click", advanceOcrQueue);
+document.getElementById("ocrClose").addEventListener("click", closeOcrOverlay);
+document.getElementById("btnCamera").addEventListener("click", openOcrCapture);
 
 document.addEventListener("click", (e)=>{
   if(e.target.closest(".techpicker")) return;
@@ -3839,6 +4255,7 @@ document.getElementById("btnMoreTools").addEventListener("click", ()=>{
   setupPWA();
   updateAlertsButton();
   initVoiceEntry();
+  updateCameraFabState();
   setView("log");
 })();
 
