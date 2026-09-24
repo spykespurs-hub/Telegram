@@ -609,10 +609,20 @@
   .ocr-camera-wrap{ position:relative; flex:1; min-height:0; overflow:hidden; background:#000; }
   .ocr-camera-wrap video{ width:100%; height:100%; object-fit:cover; display:block; }
   .ocr-reticle{
-    position:absolute; left:6%; right:6%; top:32%; bottom:32%;
-    border:2px dashed rgba(90,169,230,.85); border-radius:12px; pointer-events:none;
+    position:absolute; left:6%; top:32%; width:88%; height:36%;
+    border:2px dashed rgba(90,169,230,.85); border-radius:12px;
+    touch-action:none; cursor:move;
   }
   .ocr-reticle.locked{ border-color:var(--green); border-style:solid; box-shadow:0 0 24px rgba(51,214,144,.5); }
+  .ocr-handle{
+    position:absolute; width:28px; height:28px; border-radius:50%;
+    background:rgba(90,169,230,.95); border:2px solid #fff; transform:translate(-50%,-50%);
+    touch-action:none; box-shadow:0 2px 6px rgba(0,0,0,.4);
+  }
+  .ocr-handle.tl{ left:0; top:0; cursor:nwse-resize; }
+  .ocr-handle.tr{ left:100%; top:0; cursor:nesw-resize; }
+  .ocr-handle.bl{ left:0; top:100%; cursor:nesw-resize; }
+  .ocr-handle.br{ left:100%; top:100%; cursor:nwse-resize; }
   .ocr-dim{ position:absolute; background:rgba(0,0,0,.32); pointer-events:none; }
   .ocr-dim.top{ left:0; right:0; top:0; height:32%; }
   .ocr-dim.bottom{ left:0; right:0; bottom:0; height:32%; }
@@ -911,7 +921,12 @@
     <video id="ocrVideo" autoplay playsinline muted webkit-playsinline="true"></video>
     <canvas id="ocrCanvas" style="display:none"></canvas>
     <div class="ocr-dim top"></div><div class="ocr-dim bottom"></div><div class="ocr-dim left"></div><div class="ocr-dim right"></div>
-    <div class="ocr-reticle" id="ocrReticle"></div>
+    <div class="ocr-reticle" id="ocrReticle">
+      <div class="ocr-handle tl" data-h="tl"></div>
+      <div class="ocr-handle tr" data-h="tr"></div>
+      <div class="ocr-handle bl" data-h="bl"></div>
+      <div class="ocr-handle br" data-h="br"></div>
+    </div>
     <div class="ocr-scanstatus" id="ocrScanStatus">Starting camera…</div>
   </div>
   <div class="ocr-review no-print" id="ocrReview" style="display:none">
@@ -2559,16 +2574,16 @@ window.toggleVoiceEntry = toggleVoiceEntry;
    ========================================================= */
 const GROUP_DEFS = {
   ups: {
-    iv:   { label:"Input Voltage",          sub:"L1 / L2 / L3",   fields:["iv.0","iv.1","iv.2"],                     labels:["L1","L2","L3"] },
-    ov:   { label:"Output Voltage",         sub:"L1 / L2 / L3",   fields:["ov.0","ov.1","ov.2"],                     labels:["L1","L2","L3"] },
-    upm:  { label:"Universal Power Module", sub:"Modules 1–5",    fields:["upm.0","upm.1","upm.2","upm.3","upm.4"],  labels:["1","2","3","4","5"] },
-    bvrt: { label:"Batt VDC + Runtime",     sub:"Battery, then runtime", fields:["bv","rt"],                        labels:["Batt VDC","Runtime min"] }
+    iv:   { label:"Input Voltage",          sub:"L1 / L2 / L3",   fields:["iv.0","iv.1","iv.2"],                     labels:["L1","L2","L3"],             ranges:[[300,460],[300,460],[300,460]] },
+    ov:   { label:"Output Voltage",         sub:"L1 / L2 / L3",   fields:["ov.0","ov.1","ov.2"],                     labels:["L1","L2","L3"],             ranges:[[300,460],[300,460],[300,460]] },
+    upm:  { label:"Universal Power Module", sub:"Modules 1–5",    fields:["upm.0","upm.1","upm.2","upm.3","upm.4"],  labels:["1","2","3","4","5"],        ranges:[[0,150],[0,150],[0,150],[0,150],[0,150]] },
+    bvrt: { label:"Batt VDC + Runtime",     sub:"Battery, then runtime", fields:["bv","rt"],                        labels:["Batt VDC","Runtime min"],   ranges:[[350,650],[0,300]] }
   },
   sts: {
-    s1: { label:"Source 1",      sub:"L1 / L2 / L3", fields:["s1.0","s1.1","s1.2"], labels:["L1","L2","L3"] },
-    s2: { label:"Source 2",      sub:"L1 / L2 / L3", fields:["s2.0","s2.1","s2.2"], labels:["L1","L2","L3"] },
-    lp: { label:"Load %",        sub:"L1 / L2 / L3", fields:["lp.0","lp.1","lp.2"], labels:["L1","L2","L3"] },
-    ic: { label:"Input Current", sub:"L1 / L2 / L3", fields:["ic.0","ic.1","ic.2"], labels:["L1","L2","L3"] }
+    s1: { label:"Source 1",      sub:"L1 / L2 / L3", fields:["s1.0","s1.1","s1.2"], labels:["L1","L2","L3"], ranges:[[190,250],[190,250],[190,250]] },
+    s2: { label:"Source 2",      sub:"L1 / L2 / L3", fields:["s2.0","s2.1","s2.2"], labels:["L1","L2","L3"], ranges:[[190,250],[190,250],[190,250]] },
+    lp: { label:"Load %",        sub:"L1 / L2 / L3", fields:["lp.0","lp.1","lp.2"], labels:["L1","L2","L3"], ranges:[[0,100],[0,100],[0,100]] },
+    ic: { label:"Input Current", sub:"L1 / L2 / L3", fields:["ic.0","ic.1","ic.2"], labels:["L1","L2","L3"], ranges:[[0,500],[0,500],[0,500]] }
   }
 };
 const ARMED_GROUPS = new Set(); // "ups:iv", "sts:s2", ...
@@ -2657,7 +2672,9 @@ function openOcrCapture(){
   ocrQueue = groups;
   ocrQueueIdx = 0;
   ocrFilledCount = 0;
+  reticleBox = null; // recenter to a fresh default box for this scan session
   document.getElementById("ocrOverlay").style.display = "flex";
+  layoutReticle();
   startOcrGroup();
 }
 window.openOcrCapture = openOcrCapture;
@@ -2678,9 +2695,10 @@ async function startOcrGroup(){
   document.getElementById("ocrCaptureBtn").style.display = "";
   document.getElementById("ocrConfirmBtn").style.display = "none";
   document.getElementById("ocrReticle").classList.remove("locked");
-  setOcrStatus("Point the camera at the display…");
+  setOcrStatus("Drag the box over the numbers, or resize with the corner dots…");
   ocrConfidenceReadings = [];
   await ensureOcrCamera();
+  layoutReticle();
   ensureOcrEngine(setOcrStatus).catch(e=>{
     console.error(e);
     setOcrStatus("OCR engine failed to load — use Capture now, then type values manually.");
@@ -2758,25 +2776,123 @@ function stopAutoScanLoop(){
   if(ocrScanTimer){ clearInterval(ocrScanTimer); ocrScanTimer=null; }
 }
 
+/* Reticle box in CSS px, relative to .ocr-camera-wrap. User-draggable
+   (move) and user-resizable (corner handles) — see initReticleInteraction. */
+let reticleBox = null;
+let reticleDrag = null;
+
+function defaultReticleBox(){
+  const wrap = document.querySelector(".ocr-camera-wrap");
+  const r = wrap.getBoundingClientRect();
+  const w = r.width*0.88, h = r.height*0.36;
+  return { left:(r.width-w)/2, top:(r.height-h)/2, width:w, height:h };
+}
+
+function layoutReticle(){
+  const wrap = document.querySelector(".ocr-camera-wrap");
+  const r = wrap.getBoundingClientRect();
+  if(r.width<=0 || r.height<=0) return;
+  if(!reticleBox) reticleBox = defaultReticleBox();
+  reticleBox.width = Math.max(60, Math.min(reticleBox.width, r.width));
+  reticleBox.height = Math.max(40, Math.min(reticleBox.height, r.height));
+  reticleBox.left = Math.max(0, Math.min(reticleBox.left, r.width - reticleBox.width));
+  reticleBox.top = Math.max(0, Math.min(reticleBox.top, r.height - reticleBox.height));
+
+  const ret = document.getElementById("ocrReticle");
+  ret.style.left = reticleBox.left+"px"; ret.style.top = reticleBox.top+"px";
+  ret.style.width = reticleBox.width+"px"; ret.style.height = reticleBox.height+"px";
+
+  const set = (sel, css)=>{ const el=document.querySelector(sel); if(el) el.style.cssText = css; };
+  set(".ocr-dim.top",    `left:0;top:0;width:100%;height:${reticleBox.top}px;`);
+  set(".ocr-dim.bottom", `left:0;top:${reticleBox.top+reticleBox.height}px;width:100%;height:${Math.max(0,r.height-(reticleBox.top+reticleBox.height))}px;`);
+  set(".ocr-dim.left",   `left:0;top:${reticleBox.top}px;width:${reticleBox.left}px;height:${reticleBox.height}px;`);
+  set(".ocr-dim.right",  `left:${reticleBox.left+reticleBox.width}px;top:${reticleBox.top}px;width:${Math.max(0,r.width-(reticleBox.left+reticleBox.width))}px;height:${reticleBox.height}px;`);
+}
+
+function applyReticleDrag(mode, dx, dy, start){
+  let {left,top,width,height} = start;
+  if(mode==="move"){ left+=dx; top+=dy; }
+  else if(mode==="tl"){ left+=dx; top+=dy; width-=dx; height-=dy; }
+  else if(mode==="tr"){ top+=dy; width+=dx; height-=dy; }
+  else if(mode==="bl"){ left+=dx; width-=dx; height+=dy; }
+  else if(mode==="br"){ width+=dx; height+=dy; }
+  if(width<60){ width=60; if(mode==="tl"||mode==="bl") left = start.left+start.width-60; }
+  if(height<40){ height=40; if(mode==="tl"||mode==="tr") top = start.top+start.height-40; }
+  reticleBox = { left, top, width, height };
+  layoutReticle();
+}
+
+function initReticleInteraction(){
+  const ret = document.getElementById("ocrReticle");
+  const startDrag = (mode)=>(e)=>{
+    if(mode==="move" && e.target.classList.contains("ocr-handle")) return; // let the handle's own listener handle it
+    e.preventDefault(); e.stopPropagation();
+    try{ e.target.setPointerCapture(e.pointerId); }catch(err){}
+    reticleDrag = { mode, startX:e.clientX, startY:e.clientY, start:{...reticleBox} };
+  };
+  const onMove = (e)=>{
+    if(!reticleDrag) return;
+    applyReticleDrag(reticleDrag.mode, e.clientX-reticleDrag.startX, e.clientY-reticleDrag.startY, reticleDrag.start);
+  };
+  const endDrag = ()=>{ reticleDrag=null; };
+  ret.addEventListener("pointerdown", startDrag("move"));
+  ret.addEventListener("pointermove", onMove);
+  ret.addEventListener("pointerup", endDrag);
+  ret.addEventListener("pointercancel", endDrag);
+  ret.querySelectorAll(".ocr-handle").forEach(h=>{
+    const mode = h.getAttribute("data-h");
+    h.addEventListener("pointerdown", startDrag(mode));
+    h.addEventListener("pointermove", onMove);
+    h.addEventListener("pointerup", endDrag);
+    h.addEventListener("pointercancel", endDrag);
+  });
+  window.addEventListener("resize", ()=>{
+    if(document.getElementById("ocrOverlay").style.display!=="none") layoutReticle();
+  });
+}
+
 function grabReticleFrame(){
   const video = document.getElementById("ocrVideo");
   const canvas = document.getElementById("ocrCanvas");
-  if(!video.videoWidth) return null;
+  if(!video.videoWidth || !reticleBox) return null;
+  const wrap = document.querySelector(".ocr-camera-wrap");
+  const rect = wrap.getBoundingClientRect();
   const vw = video.videoWidth, vh = video.videoHeight;
-  const sx = Math.round(vw*0.06), sw = Math.round(vw*0.88);
-  const sy = Math.round(vh*0.32), sh = Math.round(vh*0.36);
-  canvas.width = sw; canvas.height = sh;
-  canvas.getContext("2d").drawImage(video, sx, sy, sw, sh, 0, 0, sw, sh);
+  // video is object-fit:cover — map the on-screen reticle box back to the
+  // video's native pixel coordinates through the same crop/scale math.
+  const scale = Math.max(rect.width/vw, rect.height/vh);
+  const dispW = vw*scale, dispH = vh*scale;
+  const offX = (dispW-rect.width)/2, offY = (dispH-rect.height)/2;
+  let sx = (reticleBox.left+offX)/scale, sy = (reticleBox.top+offY)/scale;
+  let sw = reticleBox.width/scale, sh = reticleBox.height/scale;
+  sx = Math.max(0, Math.min(sx, vw-1)); sy = Math.max(0, Math.min(sy, vh-1));
+  sw = Math.max(1, Math.min(sw, vw-sx)); sh = Math.max(1, Math.min(sh, vh-sy));
+  canvas.width = Math.round(sw); canvas.height = Math.round(sh);
+  canvas.getContext("2d").drawImage(video, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
   return canvas;
 }
 
 function extractNumbers(text){
-  const m = text.match(/-?\d+\.?\d*/g);
+  // Strip timestamp-shaped substrings first — a display's on-screen clock
+  // (e.g. "2026-09-24 13:06:31") otherwise gets tokenized into stray
+  // digit runs that pollute the candidate list.
+  const cleaned = text.replace(/\d{4}-\d{2}-\d{2}/g," ").replace(/\d{1,2}:\d{2}(:\d{2})?/g," ");
+  const m = cleaned.match(/-?\d+\.?\d*/g);
   return m ? m.map(parseFloat).filter(n=>!isNaN(n)) : [];
 }
 function readingsAgree(a,b){
   if(a.length!==b.length) return false;
   return a.every((v,i)=> Math.abs(v-b[i]) < 0.5);
+}
+/* When the reticle catches more of the panel than just the target field
+   (extra columns, a stray label, etc.), prefer whichever numbers actually
+   fall in that field's plausible range instead of just the first N found. */
+function pickBestNumbers(numbers, ranges, expectedCount){
+  if(!ranges || !ranges.length) return numbers.slice(0, expectedCount);
+  const inRange = numbers.filter(n => ranges.some(r => n>=r[0] && n<=r[1]));
+  if(inRange.length >= expectedCount) return inRange.slice(0, expectedCount);
+  if(inRange.length > 0) return inRange;
+  return numbers.slice(0, expectedCount);
 }
 
 async function attemptAutoScan(){
@@ -2786,23 +2902,24 @@ async function attemptAutoScan(){
   ocrScanning = true;
   try{
     const { data } = await ocrWorker.recognize(canvas);
-    const numbers = extractNumbers(data.text);
+    const raw = extractNumbers(data.text);
     const def = GROUP_DEFS[ocrTarget.section][ocrQueue[ocrQueueIdx]];
     const expected = def.fields.length;
-    if(numbers.length === expected){
-      ocrConfidenceReadings.push(numbers);
+    const candidates = pickBestNumbers(raw, def.ranges, expected);
+    if(candidates.length === expected){
+      ocrConfidenceReadings.push(candidates);
       if(ocrConfidenceReadings.length > 2) ocrConfidenceReadings.shift();
       if(ocrConfidenceReadings.length===2 && readingsAgree(ocrConfidenceReadings[0], ocrConfidenceReadings[1])){
-        lockAndReview(numbers);
+        lockAndReview(candidates);
         return;
       }
-      setOcrStatus(`Found ${numbers.length}/${expected} — hold steady to lock…`);
-    } else if(numbers.length>0){
+      setOcrStatus(`Found ${candidates.length}/${expected} — hold steady to lock…`);
+    } else if(candidates.length>0){
       ocrConfidenceReadings = [];
-      setOcrStatus(`Found ${numbers.length}/${expected} numbers — reframe the display`);
+      setOcrStatus(`Found ${candidates.length}/${expected} likely numbers — reframe or resize the box`);
     } else {
       ocrConfidenceReadings = [];
-      setOcrStatus("Scanning… point squarely at the digits");
+      setOcrStatus("Scanning… frame just the digits you need");
     }
   }catch(e){ console.error(e); } finally { ocrScanning = false; }
 }
@@ -2858,7 +2975,8 @@ document.getElementById("ocrCaptureBtn").addEventListener("click", async ()=>{
     await ensureOcrEngine(setOcrStatus);
     const { data } = await ocrWorker.recognize(canvas);
     stopAutoScanLoop();
-    showOcrReview(extractNumbers(data.text));
+    const def = GROUP_DEFS[ocrTarget.section][ocrQueue[ocrQueueIdx]];
+    showOcrReview(pickBestNumbers(extractNumbers(data.text), def.ranges, def.fields.length));
   }catch(e){
     console.error(e);
     stopAutoScanLoop();
@@ -4311,6 +4429,7 @@ document.getElementById("btnMoreTools").addEventListener("click", ()=>{
   updateAlertsButton();
   initVoiceEntry();
   updateCameraFabState();
+  initReticleInteraction();
   setView("log");
 })();
 
