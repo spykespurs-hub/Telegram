@@ -611,9 +611,13 @@
   .ocr-reticle{
     position:absolute; left:6%; right:6%; top:32%; bottom:32%;
     border:2px dashed rgba(90,169,230,.85); border-radius:12px; pointer-events:none;
-    box-shadow:0 0 0 2000px rgba(0,0,0,.32);
   }
-  .ocr-reticle.locked{ border-color:var(--green); border-style:solid; box-shadow:0 0 0 2000px rgba(0,0,0,.32), 0 0 24px rgba(51,214,144,.5); }
+  .ocr-reticle.locked{ border-color:var(--green); border-style:solid; box-shadow:0 0 24px rgba(51,214,144,.5); }
+  .ocr-dim{ position:absolute; background:rgba(0,0,0,.32); pointer-events:none; }
+  .ocr-dim.top{ left:0; right:0; top:0; height:32%; }
+  .ocr-dim.bottom{ left:0; right:0; bottom:0; height:32%; }
+  .ocr-dim.left{ left:0; top:32%; bottom:32%; width:6%; }
+  .ocr-dim.right{ right:0; top:32%; bottom:32%; width:6%; }
   .ocr-scanstatus{
     position:absolute; left:50%; bottom:14px; transform:translateX(-50%);
     background:rgba(10,14,19,.88); border:1px solid #2a3a4a; color:#fff;
@@ -904,8 +908,9 @@
     <div class="ocr-queue-badge" id="ocrQueueBadge">1/1</div>
   </div>
   <div class="ocr-camera-wrap">
-    <video id="ocrVideo" autoplay playsinline muted></video>
+    <video id="ocrVideo" autoplay playsinline muted webkit-playsinline="true"></video>
     <canvas id="ocrCanvas" style="display:none"></canvas>
+    <div class="ocr-dim top"></div><div class="ocr-dim bottom"></div><div class="ocr-dim left"></div><div class="ocr-dim right"></div>
     <div class="ocr-reticle" id="ocrReticle"></div>
     <div class="ocr-scanstatus" id="ocrScanStatus">Starting camera…</div>
   </div>
@@ -2685,13 +2690,63 @@ async function startOcrGroup(){
 
 async function ensureOcrCamera(){
   if(ocrStream) return;
-  try{
-    ocrStream = await navigator.mediaDevices.getUserMedia({ video:{ facingMode:{ ideal:"environment" } }, audio:false });
-    document.getElementById("ocrVideo").srcObject = ocrStream;
-  }catch(e){
-    console.error(e);
+  const video = document.getElementById("ocrVideo");
+  video.setAttribute("playsinline","true");
+  video.setAttribute("webkit-playsinline","true");
+  video.muted = true;
+
+  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
     setOcrStatus("Camera unavailable.");
-    showInfoModal("Camera not available", "Couldn't open the camera. On Android Chrome this needs the page served over https:// or localhost — it's blocked from a local file:// page. You can close this and enter the readings by hand instead.");
+    showInfoModal("Camera not available", "This browser/page can't access the camera here. On Android this needs the page served over https:// or localhost — camera access is blocked from a local file:// page. You can close this and enter the readings by hand instead.");
+    return;
+  }
+
+  setOcrStatus("Requesting camera permission…");
+  // Try the back camera first (strict, then loose), then fall back to
+  // whatever camera is available — some Android WebViews throw or
+  // silently hand back a dead track for facingMode constraints they
+  // don't fully support, so we don't bet the whole feature on one form.
+  const attempts = [
+    { video:{ facingMode:{ exact:"environment" } }, audio:false },
+    { video:{ facingMode:{ ideal:"environment" } }, audio:false },
+    { video:true, audio:false }
+  ];
+  let stream = null, lastErr = null;
+  for(const constraints of attempts){
+    try{ stream = await navigator.mediaDevices.getUserMedia(constraints); break; }
+    catch(e){ lastErr = e; }
+  }
+  if(!stream){
+    console.error(lastErr);
+    setOcrStatus("Camera unavailable.");
+    const reason = lastErr && lastErr.name==="NotAllowedError"
+      ? "Camera permission was denied. Check the site/app permission for the camera and try again."
+      : "Couldn't open the camera. On Android this needs the page served over https:// or localhost — it's blocked from a local file:// page.";
+    showInfoModal("Camera not available", reason + " You can close this and enter the readings by hand instead.");
+    return;
+  }
+
+  ocrStream = stream;
+  video.srcObject = stream;
+  setOcrStatus("Starting video…");
+  try{ await video.play(); }catch(e){ /* autoplay may already be running */ }
+
+  // Wait for an actual decoded frame before trusting the feed — on some
+  // WebViews the stream opens (permission granted, track live) but the
+  // <video> sits on a blank/black frame for a beat before metadata and
+  // real pixels arrive; scanning too early just wastes OCR calls.
+  await new Promise(resolve=>{
+    if(video.videoWidth>0){ resolve(); return; }
+    let done = false;
+    const finish = ()=>{ if(done) return; done=true; video.removeEventListener("loadedmetadata",finish); resolve(); };
+    video.addEventListener("loadedmetadata", finish);
+    setTimeout(finish, 3000); // don't block forever if the event never fires
+  });
+
+  if(video.videoWidth>0){
+    setOcrStatus("Point the camera at the display…");
+  }else{
+    setOcrStatus("Camera opened but no video yet — try closing this and scanning again, and check no other app is using the camera.");
   }
 }
 
