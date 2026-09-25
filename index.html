@@ -16,6 +16,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
 <title>MUPS Watch — UPS &amp; STS Monitoring Log</title>
 <meta name="theme-color" content="#0A0E13">
+<meta name="color-scheme" content="dark light">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -30,6 +31,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
   :root{
+    color-scheme: dark light;
     --bg:#0A0E13;
     --panel:#111721;
     --panel-2:#182130;
@@ -48,6 +50,7 @@
     --blue:#5AA9E6;
     --body-glow-1:#101c26;
     --body-glow-2:#1a1420;
+    --topbar-1:#0D1319; --topbar-2:#0B1015;
     --font-display:'Space Grotesk',sans-serif;
     --font-body:'Inter',sans-serif;
     --font-mono:'JetBrains Mono',monospace;
@@ -70,6 +73,7 @@
     --red:#D0323E; --red-dim:#FBE1E3;
     --blue:#1D6FB8;
     --body-glow-1:#e9eef4; --body-glow-2:#eef1e7;
+    --topbar-1:#FFFFFF; --topbar-2:#F0F3F7;
   }
   html[data-theme="light"] ::selection{ color:#fff; }
   @media (prefers-color-scheme: light){
@@ -82,6 +86,7 @@
       --red:#D0323E; --red-dim:#FBE1E3;
       --blue:#1D6FB8;
       --body-glow-1:#e9eef4; --body-glow-2:#eef1e7;
+      --topbar-1:#FFFFFF; --topbar-2:#F0F3F7;
     }
     html[data-theme="system"] ::selection{ color:#fff; }
   }
@@ -102,7 +107,7 @@
   /* ---------- Toolbar ---------- */
   .topbar{
     position:sticky; top:0; z-index:50;
-    background:linear-gradient(180deg,#0D1319 0%, #0B1015 100%);
+    background:linear-gradient(180deg,var(--topbar-1) 0%, var(--topbar-2) 100%);
     border-bottom:1px solid var(--border);
     padding:10px 14px;
     display:flex; flex-wrap:wrap; align-items:center; gap:10px;
@@ -139,7 +144,7 @@
   .btn.primary:hover{border-color:var(--green);}
   .btn.warn{background:linear-gradient(180deg,#3a2f1c,#281f14); border-color:var(--amber-dim); color:#FBE0AC;}
   .btn.warn:hover{border-color:var(--amber);}
-  .btn.ghost{background:transparent;}
+  .btn.ghost{background:var(--panel-3); color:var(--text);}
   .zoomctl{
     display:flex; align-items:center; gap:2px; border:1px solid var(--border);
     border-radius:8px; overflow:hidden; background:var(--panel-2);
@@ -506,6 +511,19 @@
   .modal-actions{ display:flex; flex-direction:column; gap:8px; }
   .modal-actions .btn{ justify-content:center; width:100%; }
   .modal-close{ margin-top:12px; }
+  .anchored-menu-backdrop{ position:fixed; inset:0; z-index:249; background:transparent; }
+  .anchored-menu{
+    position:fixed; z-index:250; background:var(--panel-2); border:1px solid var(--border);
+    border-radius:10px; box-shadow:0 12px 30px rgba(0,0,0,.45); padding:6px;
+    min-width:230px; max-width:86vw; max-height:74vh; overflow-y:auto;
+  }
+  .anchored-menu button{
+    display:block; width:100%; text-align:left; background:transparent; border:none;
+    color:var(--text); font-family:var(--font-body); font-size:13px; padding:10px 12px;
+    border-radius:8px; cursor:pointer;
+  }
+  .anchored-menu button:hover{ background:var(--panel-3); }
+  .anchored-menu .divider{ height:1px; background:var(--border-soft); margin:5px 4px; }
   .preset-rows{ display:flex; flex-direction:column; gap:8px; margin-bottom:10px; }
   .preset-row{ display:flex; align-items:center; gap:8px; background:var(--panel); border:1px solid var(--border-soft); border-radius:8px; padding:8px 10px; }
   .preset-row-num{ font-family:var(--font-mono); color:var(--text-faint); font-size:12px; flex:none; width:16px; }
@@ -835,12 +853,8 @@
       <button id="zoomIn" title="Zoom in">+</button>
     </div>
     <button class="btn warn" id="btnLoad" data-view-only="log">⭯ Load Sample Data</button>
-    <button class="btn ghost" id="btnSavePreset" data-view-only="log" title="Save the current data as a reusable default">💾 Save as Default</button>
-    <button class="btn ghost" id="btnLoadPreset" data-view-only="log" title="Load one of your saved defaults">📂 Load Default</button>
-    <button class="btn ghost" id="btnClear" data-view-only="log">🗑 Clear All</button>
     <button class="btn ghost" id="btnMoreTools" title="More tools">⋯ More</button>
     <button class="btn primary" id="btnPrint">🖨 Export / Print PDF</button>
-    <button class="btn ghost" id="btnShare" title="Builds a PDF and opens your device's share sheet (Viber, Telegram, Messenger, Facebook, etc. if installed)">📤 Share PDF</button>
   </div>
 </div>
 
@@ -2466,14 +2480,15 @@ function parseSpokenNumber(transcript){
   const m = cleaned.match(/-?\d+(\.\d+)?/);
   return m ? parseFloat(m[0]) : null;
 }
-function showVoiceHeard(text){
+function showToast(text, ms){
   const el = document.getElementById("voiceHeardToast");
   if(!el) return;
-  el.textContent = "🎤 " + text;
+  el.textContent = text;
   el.style.opacity = "1";
   clearTimeout(el._t);
-  el._t = setTimeout(()=>{ el.style.opacity = "0"; }, 2200);
+  el._t = setTimeout(()=>{ el.style.opacity = "0"; }, ms||2200);
 }
+function showVoiceHeard(text){ showToast("🎤 " + text, 2200); }
 function handleVoiceTranscript(transcript){
   showVoiceHeard(transcript);
   const lower = transcript.toLowerCase();
@@ -2574,16 +2589,16 @@ window.toggleVoiceEntry = toggleVoiceEntry;
    ========================================================= */
 const GROUP_DEFS = {
   ups: {
-    iv:   { label:"Input Voltage",          sub:"L1 / L2 / L3",   fields:["iv.0","iv.1","iv.2"],                     labels:["L1","L2","L3"],             ranges:[[300,460],[300,460],[300,460]] },
-    ov:   { label:"Output Voltage",         sub:"L1 / L2 / L3",   fields:["ov.0","ov.1","ov.2"],                     labels:["L1","L2","L3"],             ranges:[[300,460],[300,460],[300,460]] },
-    upm:  { label:"Universal Power Module", sub:"Modules 1–5",    fields:["upm.0","upm.1","upm.2","upm.3","upm.4"],  labels:["1","2","3","4","5"],        ranges:[[0,150],[0,150],[0,150],[0,150],[0,150]] },
-    bvrt: { label:"Batt VDC + Runtime",     sub:"Battery, then runtime", fields:["bv","rt"],                        labels:["Batt VDC","Runtime min"],   ranges:[[350,650],[0,300]] }
+    iv:   { label:"Input Voltage",          sub:"L1 / L2 / L3",   fields:["iv.0","iv.1","iv.2"],                     labels:["L1","L2","L3"],             ranges:[[300,460],[300,460],[300,460]],             unitHint:"V" },
+    ov:   { label:"Output Voltage",         sub:"L1 / L2 / L3",   fields:["ov.0","ov.1","ov.2"],                     labels:["L1","L2","L3"],             ranges:[[300,460],[300,460],[300,460]],             unitHint:"V" },
+    upm:  { label:"Universal Power Module", sub:"Modules 1–5",    fields:["upm.0","upm.1","upm.2","upm.3","upm.4"],  labels:["1","2","3","4","5"],        ranges:[[0,150],[0,150],[0,150],[0,150],[0,150]],   unitHint:"KVA" },
+    bvrt: { label:"Batt VDC + Runtime",     sub:"Battery, then runtime", fields:["bv","rt"],                        labels:["Batt VDC","Runtime min"],   ranges:[[350,650],[0,300]],                          unitHint:null }
   },
   sts: {
-    s1: { label:"Source 1",      sub:"L1 / L2 / L3", fields:["s1.0","s1.1","s1.2"], labels:["L1","L2","L3"], ranges:[[190,250],[190,250],[190,250]] },
-    s2: { label:"Source 2",      sub:"L1 / L2 / L3", fields:["s2.0","s2.1","s2.2"], labels:["L1","L2","L3"], ranges:[[190,250],[190,250],[190,250]] },
-    lp: { label:"Load %",        sub:"L1 / L2 / L3", fields:["lp.0","lp.1","lp.2"], labels:["L1","L2","L3"], ranges:[[0,100],[0,100],[0,100]] },
-    ic: { label:"Input Current", sub:"L1 / L2 / L3", fields:["ic.0","ic.1","ic.2"], labels:["L1","L2","L3"], ranges:[[0,500],[0,500],[0,500]] }
+    s1: { label:"Source 1",      sub:"L1 / L2 / L3", fields:["s1.0","s1.1","s1.2"], labels:["L1","L2","L3"], ranges:[[190,250],[190,250],[190,250]], unitHint:"V" },
+    s2: { label:"Source 2",      sub:"L1 / L2 / L3", fields:["s2.0","s2.1","s2.2"], labels:["L1","L2","L3"], ranges:[[190,250],[190,250],[190,250]], unitHint:"V" },
+    lp: { label:"Load %",        sub:"L1 / L2 / L3", fields:["lp.0","lp.1","lp.2"], labels:["L1","L2","L3"], ranges:[[0,100],[0,100],[0,100]],       unitHint:null },
+    ic: { label:"Input Current", sub:"L1 / L2 / L3", fields:["ic.0","ic.1","ic.2"], labels:["L1","L2","L3"], ranges:[[0,500],[0,500],[0,500]],       unitHint:"A" }
   }
 };
 const ARMED_GROUPS = new Set(); // "ups:iv", "sts:s2", ...
@@ -2644,7 +2659,7 @@ async function ensureOcrEngine(onStatus){
   }
   onStatus && onStatus("Starting OCR engine…");
   ocrWorker = await Tesseract.createWorker("eng");
-  await ocrWorker.setParameters({ tessedit_char_whitelist: "0123456789.-" });
+  await ocrWorker.setParameters({ tessedit_char_whitelist: "0123456789.-VAKWvakw%" });
   return ocrWorker;
 }
 
@@ -2872,13 +2887,30 @@ function grabReticleFrame(){
   return canvas;
 }
 
-function extractNumbers(text){
+function extractNumbers(text, unitHint){
   // Strip timestamp-shaped substrings first — a display's on-screen clock
   // (e.g. "2026-09-24 13:06:31") otherwise gets tokenized into stray
   // digit runs that pollute the candidate list.
   const cleaned = text.replace(/\d{4}-\d{2}-\d{2}/g," ").replace(/\d{1,2}:\d{2}(:\d{2})?/g," ");
-  const m = cleaned.match(/-?\d+\.?\d*/g);
-  return m ? m.map(parseFloat).filter(n=>!isNaN(n)) : [];
+  // Prefer numbers explicitly tagged with a unit (V, kVA, kW, A) right next
+  // to them — the most reliable signal on these display panels, and it
+  // also naturally excludes unrelated columns (e.g. Current when reading
+  // Voltage) since only the requested unit's matches are kept.
+  const tagRe = /(-?\d{1,3}(?:\.\d{1,2})?)\s*(kva|kw|v|a)\b/gi;
+  const tagged = [];
+  let m;
+  while((m = tagRe.exec(cleaned))){ tagged.push({ val:parseFloat(m[1]), unit:m[2].toUpperCase() }); }
+  if(unitHint){
+    const matched = tagged.filter(t=>t.unit===unitHint.toUpperCase()).map(t=>t.val);
+    if(matched.length) return matched;
+  } else if(tagged.length){
+    return tagged.map(t=>t.val);
+  }
+  // Fall back to any 1–3 digit number (with up to 2 decimal places) —
+  // deliberately capped so an unrelated long digit run (a serial number, a
+  // garbled timestamp) can't be mistaken for a reading.
+  const m2 = cleaned.match(/-?\d{1,3}(?:\.\d{1,2})?/g);
+  return m2 ? m2.map(parseFloat).filter(n=>!isNaN(n)) : [];
 }
 function readingsAgree(a,b){
   if(a.length!==b.length) return false;
@@ -2902,8 +2934,8 @@ async function attemptAutoScan(){
   ocrScanning = true;
   try{
     const { data } = await ocrWorker.recognize(canvas);
-    const raw = extractNumbers(data.text);
     const def = GROUP_DEFS[ocrTarget.section][ocrQueue[ocrQueueIdx]];
+    const raw = extractNumbers(data.text, def.unitHint);
     const expected = def.fields.length;
     const candidates = pickBestNumbers(raw, def.ranges, expected);
     if(candidates.length === expected){
@@ -2976,7 +3008,7 @@ document.getElementById("ocrCaptureBtn").addEventListener("click", async ()=>{
     const { data } = await ocrWorker.recognize(canvas);
     stopAutoScanLoop();
     const def = GROUP_DEFS[ocrTarget.section][ocrQueue[ocrQueueIdx]];
-    showOcrReview(pickBestNumbers(extractNumbers(data.text), def.ranges, def.fields.length));
+    showOcrReview(pickBestNumbers(extractNumbers(data.text, def.unitHint), def.ranges, def.fields.length));
   }catch(e){
     console.error(e);
     stopAutoScanLoop();
@@ -3025,6 +3057,34 @@ window.removeTechFromRoster = removeTechFromRoster;
 /* =========================================================
    INPUT DELEGATION
    ========================================================= */
+/* If the first UPS unit in a room shows a Charge current (Charge A,
+   max 5), its battery is actively charging — auto-reflect that on the
+   UPS Inspection Check "Display" status for that same unit at both
+   check times, so the technician doesn't have to set it by hand. Only
+   flips it back to NORMAL when the charge current clears, and leaves
+   any other status (ABNORMAL/OFF) alone rather than overwriting it. */
+function syncAutoChargingDisplay(roomKey, ccValue){
+  const room = STATE[roomKey];
+  const u = room && room.ups && room.ups[0];
+  if(!u) return;
+  const charging = (ccValue!==null && ccValue!==undefined && ccValue!=="" && parseFloat(ccValue) > 0);
+  [0,1].forEach(i=>{
+    const cur = u.insp[i].disp;
+    let next = cur;
+    if(charging) next = "CHARGING";
+    else if(cur==="CHARGING") next = "NORMAL";
+    if(next===cur) return;
+    u.insp[i].disp = next;
+    const path = `${roomKey}.ups.0.insp.${i}.disp`;
+    const el = document.querySelector(`[data-path="${path}"]`);
+    if(el){
+      el.value = next;
+      el.className = el.className.replace(/st-\w+/g,"").trim();
+      el.classList.add(next==="NORMAL"?"st-normal":next==="ABNORMAL"?"st-abnormal":next==="CHARGING"?"st-charging":next==="OFF"?"st-off":"");
+    }
+  });
+}
+
 document.getElementById("roomsHost").addEventListener("input", (e)=>{
   const el = e.target;
   const path = el.getAttribute("data-path");
@@ -3037,6 +3097,10 @@ document.getElementById("roomsHost").addEventListener("input", (e)=>{
   }
   setPath(STATE, parts, val);
   const roomKey = parts[0];
+
+  if(parts[1]==="ups" && parts[2]===0 && parts[3]==="cc"){
+    syncAutoChargingDisplay(roomKey, val);
+  }
 
   const spec = el.getAttribute("data-spec");
   if(spec){
@@ -3166,7 +3230,7 @@ document.getElementById("btnLoad").addEventListener("click", ()=>{
   );
 });
 
-document.getElementById("btnClear").addEventListener("click", ()=>{
+function openClearAllConfirm(){
   showConfirmModal(
     "Clear all readings?",
     "Equipment IDs and capacities are kept — only readings, statuses, date/time and remarks are cleared, on every room sheet.",
@@ -3191,7 +3255,8 @@ document.getElementById("btnClear").addEventListener("click", ()=>{
       scheduleSave();
     }
   );
-});
+}
+document.getElementById("btnClear")?.addEventListener("click", openClearAllConfirm);
 
 /* =========================================================
    SAVED DEFAULTS (PRESETS) — up to 5 reusable snapshots of the
@@ -3276,7 +3341,7 @@ function flashPresetStatus(backdrop, msg){
   el._t = setTimeout(()=>{ el.style.display = "none"; }, 2500);
 }
 
-document.getElementById("btnSavePreset").addEventListener("click", async ()=>{
+async function openSavePresetModal(){
   const presets = await getPresets();
   const rowsHtml = presets.map((p,i)=>{
     const suggested = p ? p.name : ("Preset "+(i+1));
@@ -3316,9 +3381,10 @@ document.getElementById("btnSavePreset").addEventListener("click", async ()=>{
       });
     }
   );
-});
+}
+document.getElementById("btnSavePreset")?.addEventListener("click", openSavePresetModal);
 
-document.getElementById("btnLoadPreset").addEventListener("click", async ()=>{
+async function openLoadPresetModal(){
   const presets = await getPresets();
   const rowsHtml = presets.map((p,i)=>{
     const meta = p
@@ -3354,7 +3420,8 @@ document.getElementById("btnLoadPreset").addEventListener("click", async ()=>{
       });
     }
   );
-});
+}
+document.getElementById("btnLoadPreset")?.addEventListener("click", openLoadPresetModal);
 
 /* =========================================================
    BATTERY BANK WATCH — per-cell leak tracking for the battery
@@ -4230,6 +4297,41 @@ function showModal(title, html, actions){
   return close;
 }
 
+/* Lightweight anchored dropdown — for quick-action menus (the "⋯ More"
+   button) rather than the centered modal-card dialogs above, which are
+   reserved for things that need a title/description/confirmation. Opens
+   just under the anchor button and closes on any outside tap. */
+function showAnchoredMenu(anchorEl, items){
+  document.querySelectorAll(".anchored-menu, .anchored-menu-backdrop").forEach(el=>el.remove());
+  const backdrop = document.createElement("div");
+  backdrop.className = "anchored-menu-backdrop no-print";
+  const menu = document.createElement("div");
+  menu.className = "anchored-menu no-print";
+  menu.innerHTML = items.map((it,i)=> it.divider ? `<div class="divider"></div>` : `<button type="button" data-i="${i}">${it.label}</button>`).join("");
+  document.body.appendChild(backdrop);
+  document.body.appendChild(menu);
+  const rect = anchorEl.getBoundingClientRect();
+  menu.style.left = "8px"; menu.style.top = (rect.bottom+6)+"px"; // placed, then clamped below
+  requestAnimationFrame(()=>{
+    const mrect = menu.getBoundingClientRect();
+    let left = rect.right - mrect.width;
+    left = Math.max(8, Math.min(left, window.innerWidth - mrect.width - 8));
+    let top = rect.bottom + 6;
+    if(top + mrect.height > window.innerHeight - 8) top = Math.max(8, window.innerHeight - mrect.height - 8);
+    menu.style.left = left+"px"; menu.style.top = top+"px";
+  });
+  const close = ()=>{ menu.remove(); backdrop.remove(); };
+  backdrop.addEventListener("click", close);
+  menu.querySelectorAll("button[data-i]").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      const it = items[parseInt(btn.getAttribute("data-i"),10)];
+      close();
+      it.onClick && it.onClick();
+    });
+  });
+  return close;
+}
+
 /* Replaces window.confirm()/prompt()/alert() everywhere in this app.
    Those native dialogs are unreliable inside embedded Android WebViews
    (they can be disabled or return null/undefined immediately without
@@ -4302,11 +4404,13 @@ document.getElementById("btnPrint").addEventListener("click", async ()=>{
   }
 });
 
-document.getElementById("btnShare").addEventListener("click", async ()=>{
-  const btn = document.getElementById("btnShare");
-  const done = setBusy(btn, "⏳ Building PDF…");
+async function shareCurrentPdf(){
+  showToast("⏳ Building PDF…", 60000);
   try{
-    const blob = await buildPdfBlob((step,total,phase)=>{ btn.innerHTML = phase==="capturing" ? `⏳ Capturing ${step}/${total}…` : `⏳ Laying out ${step}/${total}…`; }, VIEW);
+    const blob = await buildPdfBlob((step,total,phase)=>{
+      showToast(phase==="capturing" ? `⏳ Capturing ${step}/${total}…` : `⏳ Laying out ${step}/${total}…`, 60000);
+    }, VIEW);
+    showToast("✓ PDF ready", 1500);
     const filename = pdfFilename(VIEW);
     const file = new File([blob], filename, { type:"application/pdf" });
     if(navigator.canShare && navigator.canShare({ files:[file] })){
@@ -4316,10 +4420,9 @@ document.getElementById("btnShare").addEventListener("click", async ()=>{
           title: VIEW==="battery" ? "Battery Bank Leak Report" : "MUPS Watch Report",
           text: VIEW==="battery" ? "UPS battery bank leak report" : "UPS & STS monitoring log"
         });
-        done();
         return;
       }catch(shareErr){
-        if(shareErr && shareErr.name==="AbortError"){ done(); return; } // user cancelled the share sheet
+        if(shareErr && shareErr.name==="AbortError"){ return; } // user cancelled the share sheet
         // otherwise fall through to the manual fallback below
       }
     }
@@ -4340,11 +4443,11 @@ document.getElementById("btnShare").addEventListener("click", async ()=>{
     );
   }catch(e){
     console.error(e);
+    showToast("", 1);
     showInfoModal("Couldn't build the PDF", "Check your internet connection (needed the first time, to load the PDF engine) and try again.");
-  } finally {
-    done();
   }
-});
+}
+document.getElementById("btnShare")?.addEventListener("click", shareCurrentPdf);
 
 const zoomWrap = document.getElementById("zoomWrap");
 const zoomLabel = document.getElementById("zoomLabel");
@@ -4399,25 +4502,29 @@ function setupPWA(){
    ========================================================= */
 document.getElementById("btnMoreTools").addEventListener("click", ()=>{
   const commonTail = [
-    { label: "🎨 Change theme (" + (THEMES.find(t=>t.id===THEME)||{}).short + ")", cls:"ghost", onClick: ()=>{ close(); showThemeModal(); } },
-    { label: "📋 View activity log", cls:"ghost", onClick: ()=>{ close(); showAuditLogModal(); } },
-    { label: "💾 Export full backup (.json)", cls:"ghost", onClick: ()=>{ close(); exportBackup(); } },
-    { label: "📂 Import backup (.json)", cls:"ghost", onClick: ()=>{ close(); triggerImportBackup(); } }
+    { label: "📤 Share PDF", onClick: ()=>{ shareCurrentPdf(); } },
+    { label: "🎨 Change theme (" + (THEMES.find(t=>t.id===THEME)||{}).short + ")", onClick: ()=>{ showThemeModal(); } },
+    { label: "📋 View activity log", onClick: ()=>{ showAuditLogModal(); } },
+    { divider:true },
+    { label: "💾 Export full backup (.json)", onClick: ()=>{ exportBackup(); } },
+    { label: "📂 Import backup (.json)", onClick: ()=>{ triggerImportBackup(); } }
   ];
   const logOnly = [
-    { label: ALERTS_ENABLED ? "🔔 Alarm alerts: ON — tap to turn off" : "🔕 Alarm alerts: off — tap to turn on", cls:"ghost", onClick: ()=>{ toggleAlerts(); close(); } },
-    { label: "📈 View trend history", cls:"ghost", onClick: ()=>{ close(); showTrendsModal(); } },
-    { label: "⬇ Export readings as CSV", cls:"ghost", onClick: ()=>{ close(); exportCsv(); } }
+    { label: ALERTS_ENABLED ? "🔔 Alarm alerts: ON — tap to turn off" : "🔕 Alarm alerts: off — tap to turn on", onClick: ()=>{ toggleAlerts(); } },
+    { label: "📈 View trend history", onClick: ()=>{ showTrendsModal(); } },
+    { label: "⬇ Export readings as CSV", onClick: ()=>{ exportCsv(); } },
+    { divider:true },
+    { label: "💾 Save as default", onClick: ()=>{ openSavePresetModal(); } },
+    { label: "📂 Load default", onClick: ()=>{ openLoadPresetModal(); } },
+    { label: "🗑 Clear all readings", onClick: ()=>{ openClearAllConfirm(); } },
+    { divider:true }
   ];
   const batteryOnly = [
-    { label: "🔄 Sync units from monitoring log", cls:"ghost", onClick: ()=>{ close(); syncBatteryUnitsFromLog(); } },
-    { label: "⬇ Export leak/comment report (CSV)", cls:"ghost", onClick: ()=>{ close(); exportBatteryLeakCsv(); } }
+    { label: "🔄 Sync units from monitoring log", onClick: ()=>{ syncBatteryUnitsFromLog(); } },
+    { label: "⬇ Export leak/comment report (CSV)", onClick: ()=>{ exportBatteryLeakCsv(); } },
+    { divider:true }
   ];
-  const close = showModal(
-    "More tools",
-    VIEW==="battery" ? "Battery bank tools, activity history, appearance, and data portability." : "Trend tracking, activity history, appearance, and data portability.",
-    VIEW==="battery" ? [...batteryOnly, ...commonTail] : [...logOnly, ...commonTail]
-  );
+  showAnchoredMenu(document.getElementById("btnMoreTools"), VIEW==="battery" ? [...batteryOnly, ...commonTail] : [...logOnly, ...commonTail]);
 });
 
 (async function init(){
