@@ -4087,6 +4087,7 @@ function pickFormatAndFit(canvasW, canvasH){
 
 async function buildPdfBlob(onProgress, mode){
   mode = mode || "log";
+  if(mode !== "battery") return buildTemplatePdfBlob(onProgress);
   await ensurePdfLibs();
   await ensureFontsReady();
   const { jsPDF } = window.jspdf;
@@ -4378,7 +4379,7 @@ function showFormModal(title, descHtml, fieldsHtml, primaryLabel, onSubmit){
   return { backdrop, close };
 }
 
-document.getElementById("btnPrint").addEventListener("click", async ()=>{
+async function printPdfNow(){
   const btn = document.getElementById("btnPrint");
   const done = setBusy(btn, "⏳ Building PDF…");
   try{
@@ -4402,7 +4403,8 @@ document.getElementById("btnPrint").addEventListener("click", async ()=>{
   } finally {
     done();
   }
-});
+}
+document.getElementById("btnPrint").addEventListener("click", ()=>{ if(VIEW==="battery") printPdfNow(); else showExportChooser(); });
 
 async function shareCurrentPdf(){
   showToast("⏳ Building PDF…", 60000);
@@ -4498,6 +4500,274 @@ function setupPWA(){
 }
 
 /* =========================================================
+   TEMPLATE EXPORT — PDF + Excel follow the "MONITORING MUPS RM 4" sheet.
+   Tab 1 = Room 4.  Tab 2 = every other room condensed (Room 1, 2 & 3).
+   One layout builder (tplLayout) feeds BOTH the PDF and the .xlsx writer.
+   ========================================================= */
+const TB = { ups:"Eaton93PR", sts:"DELTA" };            // brand text shown before unit IDs — edit here
+const TPL_W = [14.5,7.8,10.5,11.3,11.4,11.3,11.3,11.3,11.3,11.3,9.8,11.3,11.3,11.3,11.3,8.8,8.8,8.6,8.9]; // cols A..S
+
+function tplModels(){
+  const r4 = ROOM_ORDER.filter(k=>k==="r4"), rest = ROOM_ORDER.filter(k=>k!=="r4");
+  const defs = [];
+  if(r4.length) defs.push({name:"Room 4", keys:r4});
+  if(rest.length) defs.push({name:"Room 1, 2 & 3", keys:rest});
+  const uniq = a=>[...new Set(a.filter(Boolean))];
+  const has = s=>[].concat(s.s1,s.s2,s.lp,s.ic,s.fq,[s.temp]).some(v=>v!=null);
+  const d2s = d=>{ const m=/^(\d+)-(\d+)-(\d+)$/.exec(d||""); const t=m?Date.UTC(+m[1],+m[2]-1,+m[3]):Date.now(); return Math.floor(t/864e5)+25569; };
+  const t2f = t=>{ const m=/^(\d{1,2}):(\d{2})/.exec(t||""); return m ? (+m[1]*60+ +m[2])/1440 : null; };
+  return defs.map(d=>{
+    const rooms = d.keys.map(k=>STATE[k]);
+    return { name:d.name,
+      duty: uniq(rooms.flatMap(r=>parseTechList(r.dutyEngineers))).join(" / "),
+      loc: uniq(rooms.map(r=>r.location)).join(" / "),
+      date: d2s((rooms.find(r=>r.date)||{}).date), time: t2f(rooms[0].time),
+      t1: t2f(rooms[0].checkTime1), t2: t2f(rooms[0].checkTime2),
+      ups: rooms.flatMap(r=>r.ups),
+      sts: rooms.flatMap(r=>r.sts).filter(s=>s.n||has(s)).map(s=>Object.assign({},s,{tf:t2f(s.time)})),
+      sig:(rooms.find(r=>r.ackSignature)||{}).ackSignature||null, remarks: uniq(rooms.map(r=>r.remarks)).join("  "), ack: uniq(rooms.map(r=>r.ackBy)).join(" / ") };
+  });
+}
+
+function tplLayout(m){
+  const cells=[], C=(r,c,v,st,rs,cs,f)=>cells.push({r,c,v,st,rs:rs||1,cs:cs||1,f});
+  const H={b:1,sz:8,fill:1,al:"c",wrap:1}, HL={b:1,sz:8,fill:1,al:"l"}, H6=Object.assign({},H,{sz:6});
+  const N={sz:9,al:"r",fmt:"0.0"}, NI={sz:9,al:"r"}, T={sz:9,al:"c"}, TL={sz:8,al:"l"}, LB={b:1,sz:6.5,al:"c"};
+  const fl=(st,bad)=>bad?Object.assign({},st,{red:1}):st;
+  const out=(v,lo,hi)=>v!=null&&((hi!=null&&v>hi)||(lo!=null&&v<lo));
+  const nU=m.ups.length, nS=m.sts.length;
+
+  C(1,1,"Shift Duty:",HL,1,2); C(1,3,m.duty,TL,1,4);
+  C(2,1,"Location:",HL,1,2);   C(2,3,m.loc,TL,1,4);
+  C(3,1,"Date:",HL,1,2);       C(3,3,m.date,{sz:8,al:"l",fmt:"date"},1,4);
+  C(4,1,"Time:",HL,1,2);       C(4,3,m.time,{sz:8,al:"l",fmt:"time"},1,4);
+  C(1,7,"",T,4,6); C(1,13,"",T,4,3); C(1,16,"",T,4,4);           // logo boxes
+  cells[cells.length-3].logo="mid"; cells[cells.length-1].logo="right";
+
+  C(5,1,"UPS",H,1,2); C(6,1,"Equipment",H); C(6,2,"Capacity",H);
+  C(5,3,"Input Voltage (↑10% ↓-10%)",H,1,3); C(5,6,"Output Voltage (↑10% ↓-10%)",H,1,3);
+  C(5,9,"Load\nKVA",H,2); C(5,10,"Total Load KVA",H,2); C(5,11,"Universal Power Module",H,1,5);
+  C(5,16,"BATTERY",H,1,2); C(5,18,"Charging Current (Max: 5A)",H6,2); C(5,19,"Room Temperature < 22°C",H6,2);
+  ["L1","L2","L3","L1","L2","L3"].forEach((t,i)=>C(6,3+i,t,H));
+  for(let i=1;i<=5;i++) C(6,10+i,String(i),H);
+  C(6,16,"VDC ≈ 520V",H6); C(6,17,"Runtime",H);
+  m.ups.forEach((u,i)=>{ const r=7+i;
+    C(r,1,TB.ups+"    "+u.n,{b:1,sz:6,al:"c"}); C(r,2,u.c,LB);
+    u.iv.forEach((v,k)=>C(r,3+k,v,fl(N,out(v,380,420))));
+    u.ov.forEach((v,k)=>C(r,6+k,v,fl(N,out(v,380,420))));
+    C(r,9,u.lk,fl(N,out(u.lk,null,300)));
+    u.upm.forEach((v,k)=>C(r,11+k,v,fl(N,out(v,null,60))));
+    C(r,16,u.bv,fl(N,out(u.bv,505,555))); C(r,17,u.rt,N);
+    C(r,18,u.cc,fl(N,out(u.cc,null,5))); C(r,19,u.rtemp,fl(N,out(u.rtemp,null,22)));
+  });
+  for(let i=0;i<nU;i+=2){ const pr=i+1<nU, v=[m.ups[i].lk,pr?m.ups[i+1].lk:null].filter(x=>x!=null);
+    const tv=v.length?+v.reduce((a,b)=>a+b,0).toFixed(1):null;
+    C(7+i,10,tv,fl(N,out(tv,null,600)),pr?2:1,1,tv==null?null:(pr?`I${7+i}+I${8+i}`:`I${7+i}`)); }
+
+  const s0=7+nU;
+  C(s0,1,"STS",H,1,2); C(s0,3,"",H); C(s0,4,"Source 1 (V) (220-240V)",H,1,3); C(s0,7,"Source 2 (V) (220-240V)",H,1,3);
+  C(s0,10,"Load Percentage",H,1,3); C(s0,13,"Input Current",H,1,3); C(s0,16,"Temperature\n(0°C - 40°C)",H6,2);
+  C(s0,17,"Frequency (±4Hz)",H,1,2); C(s0,19,"Time",H,2);
+  C(s0+1,1,"Equipment",H,1,2); C(s0+1,3,"Capacity",H);
+  for(let i=0;i<12;i++) C(s0+1,4+i,"L"+(i%3+1),H);
+  C(s0+1,17,"S1",H); C(s0+1,18,"S2",H);
+  m.sts.forEach((s,i)=>{ const r=s0+2+i;
+    C(r,1,TB.sts,LB); C(r,2,s.n,LB); C(r,3,s.c,LB);
+    [].concat(s.s1,s.s2).forEach((v,k)=>C(r,4+k,v,fl(NI,out(v,220,240))));
+    s.lp.forEach((v,k)=>C(r,10+k,v,fl(NI,out(v,null,100))));
+    s.ic.forEach((v,k)=>C(r,13+k,v,fl(NI,out(v,null,400))));
+    C(r,16,s.temp,NI);
+    s.fq.forEach((v,k)=>C(r,17+k,v,fl(N,out(v,59.5,60.5))));
+    C(r,19,s.tf,{sz:9,al:"r",fmt:"time"});
+  });
+
+  const i0=s0+2+nS, tf=v=>({sz:8,al:"l",fmt:"time"});
+  C(i0,1,"Time:",HL,1,2); C(i0,3,m.t1,tf(),1,8); C(i0,11,"Time:",HL); C(i0,12,m.t2,tf(),1,8);
+  const bad=v=>v==="ABNORMAL"||v==="OFF"?Object.assign({},T,{red:1}):T;
+  function block(r0,title,list,isUps){
+    C(r0,1,title,H,1,2); C(r0+1,1,"Equipment",H); C(r0+1,2,"Label",H);
+    [[3,"INSPECT THE GENERAL CONDITION OF THE UNIT",3],[6,"CHECK THE TEMPERATURE OF THE EQUIPMENT (AMBIENT TEMPERATURE)",3],[9,"CHECK THE DISPLAY MONITOR STATUS",2]].forEach(a=>C(r0,a[0],a[1],H,2,a[2]));
+    C(r0,11,title,H); C(r0+1,11,"Label",H);
+    [[12,"INSPECT THE GENERAL CONDITION OF THE UNIT",3],[15,"CHECK THE TEMPERATURE OF THE EQUIPMENT (AMBIENT TEMPERATURE)",3],[18,"CHECK THE DISPLAY MONITOR STATUS",2]].forEach(a=>C(r0,a[0],a[1],H,2,a[2]));
+    list.forEach((u,i)=>{ const r=r0+2+i, a=u.insp[0], b=u.insp[1];
+      if(isUps){ C(r,1,TB.ups+"    "+u.n,{b:1,sz:6,al:"c"}); C(r,2,u.c,LB); } else { C(r,1,TB.sts,LB); C(r,2,u.n,LB); }
+      C(r,11,u.n,LB);
+      C(r,3,a.cond,bad(a.cond),1,3); C(r,6,a.temp,{sz:9,al:"c",fmt:"0.0"},1,3); C(r,9,a.disp,bad(a.disp),1,2);
+      C(r,12,b.cond,bad(b.cond),1,3); C(r,15,b.temp,{sz:9,al:"c",fmt:"0.0"},1,3); C(r,18,b.disp,bad(b.disp),1,2);
+    });
+    return r0+2+list.length;
+  }
+  let r=block(i0+1,"UPS",m.ups,true);
+  r=block(r,"STS",m.sts,false);
+  C(r,1,"       REMARKS",HL,1,12); C(r,13,"Acknowledged by:",HL,1,7);
+  C(r+1,1,m.remarks,{b:1,sz:10,al:"l",wrap:1},2,12); C(r+1,13,m.ack,{sz:9,al:"l"},2,7); if(m.sig) cells[cells.length-1].img=m.sig;
+  return {cells, rows:r+2};
+}
+
+
+/* ---------- APSI logos, redrawn as crisp vectors (rendered to hi-res PNG once) ---------- */
+let LOGOS=null;
+async function getLogos(){
+  if(LOGOS) return LOGOS;
+  const BLUE="#1B3F9E", YEL="#F4EC1C";
+  const mk=(w,h)=>{ const cv=document.createElement("canvas"); cv.width=w; cv.height=h; return cv; };
+  const png=async cv=>({ url:cv.toDataURL("image/png"), w:cv.width, h:cv.height, bytes:new Uint8Array(await (await new Promise(r=>cv.toBlob(r,"image/png"))).arrayBuffer()) });
+  let cv=mk(768,784), g=cv.getContext("2d"); g.scale(4,4); g.translate(-4,-2);
+  g.fillStyle=BLUE; g.beginPath(); g.moveTo(100,6); g.lineTo(191.3,150); g.lineTo(8.7,150); g.closePath(); g.fill();
+  g.fillStyle=YEL;  g.beginPath(); g.moveTo(100,35); g.lineTo(167.2,141); g.lineTo(32.8,141); g.closePath(); g.fill();
+  g.fillStyle=BLUE; g.fillRect(61,116,115,13); g.fillRect(76,101,17,16);
+  g.textBaseline="alphabetic"; g.font='900 44px "Arial Black", Arial, Helvetica, sans-serif';
+  const L=["A","P","S","I"], ws=L.map(c=>g.measureText(c).width), gap=(148-ws.reduce((a,b)=>a+b,0))/3; let x=26;
+  L.forEach((c,i)=>{ g.fillText(c,x,193); x+=ws[i]+gap; });
+  const mid=await png(cv);
+  cv=mk(960,250); g=cv.getContext("2d"); g.fillStyle="#1b1b1b"; g.textBaseline="alphabetic";
+  const TL=["Electrotechnical Construction,","Solutions and Services","PCAB No. 35293"], FF='"Segoe UI", Calibri, "Trebuchet MS", Arial, sans-serif';
+  let fs=58; g.font=`600 ${fs}px ${FF}`;
+  const wmax=Math.max(...TL.map(t=>g.measureText(t).width)); if(wmax>940){ fs=Math.floor(fs*940/wmax); g.font=`600 ${fs}px ${FF}`; }
+  TL.forEach((t,i)=>g.fillText(t,6,56+i*78));
+  const right=await png(cv);
+  return LOGOS={mid,right};
+}
+
+/* ---------- shared cell text ---------- */
+function tplText(c){
+  const v=c.v, f=c.st.fmt;
+  if(v==null||v==="") return "";
+  if(f==="0.0") return (+v).toFixed(1);
+  if(f==="date"){ const d=new Date((v-25569)*864e5), p=n=>String(n).padStart(2,"0"); return p(d.getUTCDate())+"/"+p(d.getUTCMonth()+1)+"/"+d.getUTCFullYear(); }
+  if(f==="time"){ const t=Math.round(v*1440), h=Math.floor(t/60)%24, m=t%60; return ((h%12)||12)+":"+String(m).padStart(2,"0")+" "+(h<12?"AM":"PM"); }
+  return String(v);
+}
+const esc=s=>String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+
+/* ---------- PDF page (HTML table → html2canvas) ---------- */
+function tplHtml(m){
+  const L=tplLayout(m), grid={}, skip={};
+  L.cells.forEach(c=>{ grid[c.r+","+c.c]=c; for(let i=0;i<c.rs;i++)for(let j=0;j<c.cs;j++) if(i||j) skip[(c.r+i)+","+(c.c+j)]=1; });
+  let h='<div style="width:1500px;background:#fff;color:#000;font-family:Arial,Helvetica,sans-serif;padding:8px"><table style="border-collapse:collapse;table-layout:fixed;width:100%"><colgroup>'+TPL_W.map(w=>`<col style="width:${(w/TPL_W.reduce((a,b)=>a+b,0)*100).toFixed(3)}%">`).join("")+'</colgroup>';
+  for(let r=1;r<=L.rows;r++){ h+='<tr style="height:19px">';
+    for(let c=1;c<=19;c++){ const k=r+","+c; if(skip[k]) continue; const x=grid[k];
+      const st=x?x.st:{sz:9,al:"c"}, al={l:"left",c:"center",r:"right"}[st.al||"c"];
+      h+=`<td${x&&x.rs>1?` rowspan="${x.rs}"`:""}${x&&x.cs>1?` colspan="${x.cs}"`:""} style="border:1px solid #000;padding:0 3px;overflow:hidden;font-size:${(st.sz||9)*1.45}px;font-weight:${st.b?700:400};text-align:${al};vertical-align:middle;line-height:1.15;${st.fill?"background:#B3C6E6;":""}${st.red?"background:#FFC7CE;color:#9C0006;":""}${st.wrap?"":"white-space:nowrap;"}">${esc(x?tplText(x):"").replace(/\n/g,"<br>")}${x&&x.img?`<img src="${x.img}" style="height:34px;vertical-align:middle;margin-left:10px">`:""}${x&&x.logo&&LOGOS?`<img src="${LOGOS[x.logo].url}" style="display:block;height:${x.logo==="mid"?72:54}px;margin:0 ${x.logo==="mid"?"auto":"0 0 auto"}">`:""}</td>`; }
+    h+="</tr>"; }
+  return h+"</table></div>";
+}
+
+async function buildTemplatePdfBlob(onProgress){
+  await ensurePdfLibs(); await getLogos(); await ensureFontsReady();
+  const { jsPDF } = window.jspdf, pdf = new jsPDF({orientation:"landscape",unit:"pt",format:"a4"});
+  const pw=pdf.internal.pageSize.getWidth(), ph=pdf.internal.pageSize.getHeight(), models=tplModels();
+  const ov=document.createElement("div");
+  ov.style.cssText="position:absolute;top:0;left:0;width:1500px;z-index:9999;background:#fff";
+  document.body.appendChild(ov); window.scrollTo(0,0);
+  try{
+    for(let i=0;i<models.length;i++){
+      if(onProgress) onProgress(i+1,models.length,"capturing");
+      ov.innerHTML=tplHtml(models[i]);
+      const cv=await window.html2canvas(ov.firstChild,{backgroundColor:"#ffffff",scale:2,windowWidth:1500,useCORS:true});
+      const mg=18, k=Math.min((pw-2*mg)/cv.width,(ph-2*mg)/cv.height), w=cv.width*k, h=cv.height*k;
+      if(i>0) pdf.addPage("a4","landscape");
+      pdf.addImage(cv.toDataURL("image/jpeg",0.9),"JPEG",(pw-w)/2,mg,w,h);   // top-aligned like the sheet
+    }
+  } finally { ov.remove(); }
+  return pdf.output("blob");
+}
+
+/* ---------- Excel (.xlsx) writer — no libraries, works offline ---------- */
+function crc32(b){ let t=crc32.t; if(!t){ t=crc32.t=[]; for(let n=0;n<256;n++){ let c=n; for(let k=0;k<8;k++) c=c&1?0xEDB88320^(c>>>1):c>>>1; t[n]=c>>>0; } }
+  let r=-1; for(let i=0;i<b.length;i++) r=t[(r^b[i])&255]^(r>>>8); return (r^-1)>>>0; }
+function zipStore(files){
+  const enc=new TextEncoder(), parts=[], cd=[]; let off=0;
+  const u16=n=>[n&255,(n>>8)&255], u32=n=>[n&255,(n>>8)&255,(n>>16)&255,(n>>>24)&255];
+  files.forEach(f=>{ const nm=enc.encode(f.name), d=(f.data instanceof Uint8Array)?f.data:enc.encode(f.data), crc=crc32(d);
+    const lh=[0x50,0x4b,3,4,...u16(20),...u16(0),...u16(0),...u16(0),...u16(0x21),...u32(crc),...u32(d.length),...u32(d.length),...u16(nm.length),...u16(0)];
+    parts.push(new Uint8Array(lh),nm,d);
+    cd.push(new Uint8Array([0x50,0x4b,1,2,...u16(20),...u16(20),...u16(0),...u16(0),...u16(0),...u16(0x21),...u32(crc),...u32(d.length),...u32(d.length),...u16(nm.length),...u16(0),...u16(0),...u16(0),...u16(0),...u32(0),...u32(off)]),nm);
+    off+=lh.length+nm.length+d.length; });
+  const cdLen=cd.reduce((a,x)=>a+x.length,0);
+  return new Blob(parts.concat(cd,[new Uint8Array([0x50,0x4b,5,6,0,0,0,0,...u16(files.length),...u16(files.length),...u32(cdLen),...u32(off),0,0])]),{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
+}
+function mkStyles(){
+  const fonts=[],fills=['<fill><patternFill patternType="none"/></fill>','<fill><patternFill patternType="gray125"/></fill>'],xfs=[],map={};
+  const ix=(a,x)=>{ let i=a.indexOf(x); if(i<0){ a.push(x); i=a.length-1; } return i; };
+  const nf={"0.0":164,date:165,time:18};
+  const sid=st=>{ const k=JSON.stringify(st); if(k in map) return map[k];
+    const fo=ix(fonts,`<font>${st.b?"<b/>":""}<sz val="${st.sz||9}"/><color rgb="FF${st.red?"9C0006":"000000"}"/><name val="Arial"/></font>`);
+    const fi=st.red?ix(fills,'<fill><patternFill patternType="solid"><fgColor rgb="FFFFC7CE"/><bgColor indexed="64"/></patternFill></fill>')
+      :st.fill?ix(fills,'<fill><patternFill patternType="solid"><fgColor rgb="FFB3C6E6"/><bgColor indexed="64"/></patternFill></fill>'):0;
+    const al={l:"left",c:"center",r:"right"}[st.al||"c"];
+    xfs.push(`<xf numFmtId="${nf[st.fmt]||0}" fontId="${fo}" fillId="${fi}" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="${al}" vertical="center"${st.wrap?' wrapText="1"':""}/></xf>`);
+    return map[k]=xfs.length-1; };
+  sid({sz:9});
+  const xml=()=>'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="2"><numFmt numFmtId="164" formatCode="0.0"/><numFmt numFmtId="165" formatCode="dd/mm/yyyy"/></numFmts>'
+    +`<fonts count="${fonts.length}">${fonts.join("")}</fonts><fills count="${fills.length}">${fills.join("")}</fills>`
+    +'<borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="thin"><color auto="1"/></left><right style="thin"><color auto="1"/></right><top style="thin"><color auto="1"/></top><bottom style="thin"><color auto="1"/></bottom><diagonal/></border></borders>'
+    +'<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>'
+    +`<cellXfs count="${xfs.length}">${xfs.join("")}</cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`;
+  return {sid,xml};
+}
+function colL(n){ return String.fromCharCode(64+n); }
+function sheetXml(m,S){
+  const L=tplLayout(m), rows={}, merges=[];
+  L.cells.forEach(c=>{ const s=S.sid(c.st);
+    for(let i=0;i<c.rs;i++)for(let j=0;j<c.cs;j++){ const r=c.r+i,cc=c.c+j; (rows[r]=rows[r]||{})[cc]=(i||j)?{s}:{s,c}; }
+    if(c.rs>1||c.cs>1) merges.push(`${colL(c.c)}${c.r}:${colL(c.c+c.cs-1)}${c.r+c.rs-1}`); });
+  let sd="";
+  for(let r=1;r<=L.rows;r++){ const row=rows[r]||{}; sd+=`<row r="${r}" ht="${r>=5&&r<=6?15:14.4}" customHeight="1">`;
+    for(let c=1;c<=19;c++){ const x=row[c]; if(!x) continue; const ref=colL(c)+r, cl=x.c;
+      if(!cl||cl.v==null||cl.v==="") sd+=`<c r="${ref}" s="${x.s}"/>`;
+      else if(typeof cl.v==="number") sd+=`<c r="${ref}" s="${x.s}">${cl.f?`<f>${cl.f}</f>`:""}<v>${cl.v}</v></c>`;
+      else sd+=`<c r="${ref}" s="${x.s}" t="inlineStr"><is><t xml:space="preserve">${esc(cl.v)}</t></is></c>`; }
+    sd+="</row>"; }
+  return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheetPr><pageSetUpPr fitToPage="1"/></sheetPr><sheetViews><sheetView workbookViewId="0" showGridLines="0"/></sheetViews><sheetFormatPr defaultRowHeight="14.4"/>'
+    +"<cols>"+TPL_W.map((w,i)=>`<col min="${i+1}" max="${i+1}" width="${w}" customWidth="1"/>`).join("")+"</cols>"
+    +`<sheetData>${sd}</sheetData><mergeCells count="${merges.length}">${merges.map(x=>`<mergeCell ref="${x}"/>`).join("")}</mergeCells>`
+    +'<pageMargins left="0.25" right="0.25" top="0.25" bottom="0.25" header="0" footer="0"/><pageSetup paperSize="9" orientation="landscape" fitToWidth="1" fitToHeight="1"/><drawing r:id="rId1"/></worksheet>';
+}
+async function buildXlsx(){
+  const lg=await getLogos(), models=tplModels(), S=mkStyles(), sh=models.map(m=>sheetXml(m,S)), n=sh.length, X='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
+  const pic=(id,rid,col,co,ro,cx,cy)=>`<xdr:oneCellAnchor><xdr:from><xdr:col>${col}</xdr:col><xdr:colOff>${co}</xdr:colOff><xdr:row>0</xdr:row><xdr:rowOff>${ro}</xdr:rowOff></xdr:from><xdr:ext cx="${cx}" cy="${cy}"/><xdr:pic><xdr:nvPicPr><xdr:cNvPr id="${id}" name="Logo ${id}"/><xdr:cNvPicPr><a:picLocks noChangeAspect="1"/></xdr:cNvPicPr></xdr:nvPicPr><xdr:blipFill><a:blip r:embed="${rid}"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill><xdr:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic><xdr:clientData/></xdr:oneCellAnchor>`;
+  const midCy=660000, rtCy=520000, rtCx=Math.round(rtCy*lg.right.w/lg.right.h);
+  const drawing=X+'<xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
+    +pic(2,"rId1",8,420000,15000,Math.round(midCy*lg.mid.w/lg.mid.h),midCy)+pic(3,"rId2",15,200000,95000,rtCx,rtCy)+"</xdr:wsDr>";
+  const R='http://schemas.openxmlformats.org/officeDocument/2006/relationships';
+  const files=[
+   {name:"[Content_Types].xml",data:X+'<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Default Extension="png" ContentType="image/png"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>'+sh.map((_,i)=>`<Override PartName="/xl/worksheets/sheet${i+1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/drawings/drawing${i+1}.xml" ContentType="application/vnd.openxmlformats-officedocument.drawing+xml"/>`).join("")+"</Types>"},
+   {name:"_rels/.rels",data:X+`<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="${R}/officeDocument" Target="xl/workbook.xml"/></Relationships>`},
+   {name:"xl/workbook.xml",data:X+`<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="${R}"><sheets>`+models.map((m,i)=>`<sheet name="${esc(m.name)}" sheetId="${i+1}" r:id="rId${i+1}"/>`).join("")+"</sheets></workbook>"},
+   {name:"xl/_rels/workbook.xml.rels",data:X+'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'+sh.map((_,i)=>`<Relationship Id="rId${i+1}" Type="${R}/worksheet" Target="worksheets/sheet${i+1}.xml"/>`).join("")+`<Relationship Id="rId${n+1}" Type="${R}/styles" Target="styles.xml"/></Relationships>`},
+   {name:"xl/styles.xml",data:S.xml()},
+   {name:"xl/media/logo_mark.png",data:lg.mid.bytes},{name:"xl/media/logo_text.png",data:lg.right.bytes}
+  ];
+  sh.forEach((x,i)=>{
+    files.push({name:`xl/worksheets/sheet${i+1}.xml`,data:x});
+    files.push({name:`xl/worksheets/_rels/sheet${i+1}.xml.rels`,data:X+`<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="${R}/drawing" Target="../drawings/drawing${i+1}.xml"/></Relationships>`});
+    files.push({name:`xl/drawings/drawing${i+1}.xml`,data:drawing});
+    files.push({name:`xl/drawings/_rels/drawing${i+1}.xml.rels`,data:X+`<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="${R}/image" Target="../media/logo_mark.png"/><Relationship Id="rId2" Type="${R}/image" Target="../media/logo_text.png"/></Relationships>`});
+  });
+  return zipStore(files);
+}
+async function exportExcelTemplate(){
+  try{
+    const a=document.createElement("a"), url=URL.createObjectURL(await buildXlsx());
+    a.href=url; a.download=pdfFilename("log").replace(/\.pdf$/,".xlsx"); document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),30000);
+    try{ logAudit(null,"Exported Excel file (template layout)."); }catch(e){}
+  }catch(e){ console.error(e); showInfoModal("Couldn't build the Excel file", e.message); }
+}
+window.MUPS_TPL={models:tplModels,html:tplHtml,xlsx:buildXlsx};
+
+function showExportChooser(){
+  let close=null;
+  const go=fn=>()=>{ if(close) close(); fn(); };
+  close=showModal("Export monitoring log",
+    "Choose the output format. Both follow the same monitoring-sheet layout: page/tab 1 = Room 4, page/tab 2 = Rooms 1, 2 &amp; 3.",
+    [ {label:"🖨 PDF — print or save",cls:"primary",onClick:go(printPdfNow)},
+      {label:"📊 Excel (.xlsx)",cls:"warn",onClick:go(exportExcelTemplate)},
+      {label:"📤 Share PDF (Viber, Telegram, …)",cls:"ghost",onClick:go(shareCurrentPdf)} ]);
+}
+
+/* =========================================================
    INIT
    ========================================================= */
 document.getElementById("btnMoreTools").addEventListener("click", ()=>{
@@ -4512,6 +4782,7 @@ document.getElementById("btnMoreTools").addEventListener("click", ()=>{
   const logOnly = [
     { label: ALERTS_ENABLED ? "🔔 Alarm alerts: ON — tap to turn off" : "🔕 Alarm alerts: off — tap to turn on", onClick: ()=>{ toggleAlerts(); } },
     { label: "📈 View trend history", onClick: ()=>{ showTrendsModal(); } },
+    { label: "📊 Export Excel (template layout)", onClick: ()=>{ exportExcelTemplate(); } },
     { label: "⬇ Export readings as CSV", onClick: ()=>{ exportCsv(); } },
     { divider:true },
     { label: "💾 Save as default", onClick: ()=>{ openSavePresetModal(); } },
