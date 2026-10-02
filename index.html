@@ -499,7 +499,7 @@
 
   /* ---------- Share modal ---------- */
   .modal-backdrop{
-    position:fixed; inset:0; background:rgba(5,8,11,.7); z-index:200;
+    position:fixed; inset:0; background:rgba(5,8,11,.7); z-index:400;
     display:flex; align-items:center; justify-content:center; padding:20px;
   }
   .modal-card{
@@ -657,6 +657,10 @@
     max-height:46vh; overflow-y:auto;
   }
   .ocr-review-hint{ font-family:var(--font-mono); font-size:10.5px; color:var(--green); margin-bottom:10px; }
+  .ocr-engine-btn{ font-family:var(--font-mono); font-size:11px; font-weight:700; padding:6px 9px; border-radius:999px; border:1px solid var(--border); background:var(--panel-3); color:var(--text); cursor:pointer; white-space:nowrap; }
+  .ocr-engine-btn.ai{ border-color:var(--green); color:var(--green); }
+  .ocr-review-field input.uncertain{ border-color:var(--amber); background:rgba(242,169,59,.14); color:var(--amber); }
+  .ocr-review-hint.warn{ color:var(--amber); }
   .ocr-review-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(84px,1fr)); gap:8px; }
   .ocr-review-field{ display:flex; flex-direction:column; gap:4px; align-items:center; }
   .ocr-review-field label{ font-family:var(--font-mono); font-size:9.5px; color:var(--text-faint); letter-spacing:.5px; text-transform:uppercase; }
@@ -929,6 +933,7 @@
       <div class="grp" id="ocrGroupLabel">—</div>
       <div class="sub" id="ocrGroupSub">—</div>
     </div>
+    <button class="ocr-engine-btn" id="ocrEngineBtn" title="Switch between AI vision and offline OCR / open OCR settings">🔤 Offline</button>
     <div class="ocr-queue-badge" id="ocrQueueBadge">1/1</div>
   </div>
   <div class="ocr-camera-wrap">
@@ -2659,7 +2664,7 @@ async function ensureOcrEngine(onStatus){
   }
   onStatus && onStatus("Starting OCR engine…");
   ocrWorker = await Tesseract.createWorker("eng");
-  await ocrWorker.setParameters({ tessedit_char_whitelist: "0123456789.-VAKWvakw%" });
+  await ocrWorker.setParameters({ tessedit_char_whitelist: "0123456789.-VAKWvakw%", tessedit_pageseg_mode: "6", preserve_interword_spaces: "1" });
   return ocrWorker;
 }
 
@@ -2710,15 +2715,22 @@ async function startOcrGroup(){
   document.getElementById("ocrCaptureBtn").style.display = "";
   document.getElementById("ocrConfirmBtn").style.display = "none";
   document.getElementById("ocrReticle").classList.remove("locked");
+  document.getElementById("ocrReviewHint").classList.remove("warn");
   setOcrStatus("Drag the box over the numbers, or resize with the corner dots…");
   ocrConfidenceReadings = [];
   await ensureOcrCamera();
   layoutReticle();
-  ensureOcrEngine(setOcrStatus).catch(e=>{
-    console.error(e);
-    setOcrStatus("OCR engine failed to load — use Capture now, then type values manually.");
-  });
-  startAutoScanLoop();
+  updateEngineUi();
+  if(ocrEngine()==="ai"){
+    stopAutoScanLoop();
+    setOcrStatus("Frame the digits, then tap 🤖 Read with AI");
+  } else {
+    ensureOcrEngine(setOcrStatus).catch(e=>{
+      console.error(e);
+      setOcrStatus("OCR engine failed to load — use Capture now, then type values manually.");
+    });
+    startAutoScanLoop();
+  }
 }
 
 async function ensureOcrCamera(){
@@ -2891,7 +2903,10 @@ function extractNumbers(text, unitHint){
   // Strip timestamp-shaped substrings first — a display's on-screen clock
   // (e.g. "2026-09-24 13:06:31") otherwise gets tokenized into stray
   // digit runs that pollute the candidate list.
-  const cleaned = text.replace(/\d{4}-\d{2}-\d{2}/g," ").replace(/\d{1,2}:\d{2}(:\d{2})?/g," ");
+  let cleaned = text.replace(/\d{4}-\d{2}-\d{2}/g," ").replace(/\d{1,2}:\d{2}(:\d{2})?/g," ");
+  // LCD decimal points are tiny and often dropped: "3891" is really 389.1 (the
+  // plausible-range filter later rejects any repaired value that makes no sense).
+  cleaned = cleaned.replace(/(?<![\d.])(\d{3})(\d)(?![\d.])/g,"$1.$2");
   // Prefer numbers explicitly tagged with a unit (V, kVA, kW, A) right next
   // to them — the most reliable signal on these display panels, and it
   // also naturally excludes unrelated columns (e.g. Current when reading
@@ -2927,17 +2942,211 @@ function pickBestNumbers(numbers, ranges, expectedCount){
   return numbers.slice(0, expectedCount);
 }
 
+
+/* =========================================================
+   OCR ENGINES (V11_11)
+   • Offline: Tesseract.js, now fed a cleaned-up image (greyscale → contrast
+     stretch → Otsu threshold → auto light-on-dark inversion → optional
+     stroke thickening to bridge LCD segment gaps), words re-ordered
+     row-by-row, plus missing-decimal repair.
+   • AI vision: sends the framed crop to Claude with the OCR prompt below.
+     Needs internet + the user's own API key (stored on this device only,
+     deliberately NOT inside STATE so backups/presets never contain it).
+   ========================================================= */
+const OCR_CFG_KEY = "mups_ocr_cfg_v1";
+const OCR_DEFAULT_MODEL = "claude-sonnet-5-5";
+function loadOcrCfg(){
+  try{ const r = Store.get(OCR_CFG_KEY); if(r && r.value) return Object.assign({engine:"offline",key:"",model:OCR_DEFAULT_MODEL}, JSON.parse(r.value)); }catch(e){}
+  return { engine:"offline", key:"", model:OCR_DEFAULT_MODEL };
+}
+let OCR_CFG = loadOcrCfg();
+function saveOcrCfg(){ Store.set(OCR_CFG_KEY, JSON.stringify(OCR_CFG)); }
+function ocrEngine(){ return (OCR_CFG.engine==="ai" && OCR_CFG.key) ? "ai" : "offline"; }
+function updateEngineUi(){
+  const b = document.getElementById("ocrEngineBtn"), cap = document.getElementById("ocrCaptureBtn");
+  const ai = ocrEngine()==="ai";
+  if(b){ b.textContent = ai ? "🤖 AI" : "🔤 Offline"; b.classList.toggle("ai", ai); }
+  if(cap && cap.style.display!=="none") cap.textContent = ai ? "🤖 Read with AI" : "📸 Capture now";
+}
+
+/* ---- image clean-up for Tesseract ---- */
+function preprocessForOcr(src, variant){
+  const sw = src.width, sh = src.height;
+  let k = sw < 1400 ? Math.min(4, 1400/sw) : (sw > 1800 ? 1800/sw : 1);
+  const w = Math.max(1, Math.round(sw*k)), h = Math.max(1, Math.round(sh*k)), pad = 24;
+  const c = document.createElement("canvas"); c.width = w; c.height = h;
+  const g = c.getContext("2d", {willReadFrequently:true});
+  g.imageSmoothingQuality = "high"; g.drawImage(src, 0, 0, w, h);
+  const img = g.getImageData(0,0,w,h), d = img.data, n = w*h, gray = new Uint8ClampedArray(n);
+  const hist = new Uint32Array(256);
+  for(let i=0,p=0;i<n;i++,p+=4){ const v = (0.299*d[p]+0.587*d[p+1]+0.114*d[p+2])|0; gray[i]=v; hist[v]++; }
+  // contrast stretch between the 2nd and 98th percentile
+  let acc=0, lo=0, hi=255; for(let v=0;v<256;v++){ acc+=hist[v]; if(acc>=n*0.02){ lo=v; break; } }
+  acc=0; for(let v=255;v>=0;v--){ acc+=hist[v]; if(acc>=n*0.02){ hi=v; break; } }
+  if(hi-lo<20){ lo=Math.max(0,lo-10); hi=Math.min(255,hi+10); }
+  const sc = 255/Math.max(1,hi-lo);
+  for(let i=0;i<n;i++) gray[i] = Math.max(0,Math.min(255,(gray[i]-lo)*sc));
+  if(variant!==2){
+    const h2 = new Uint32Array(256); for(let i=0;i<n;i++) h2[gray[i]|0]++;
+    let sum=0; for(let v=0;v<256;v++) sum+=v*h2[v];
+    let wB=0, sumB=0, best=0, thr=128;
+    for(let v=0;v<256;v++){ wB+=h2[v]; if(!wB) continue; const wF=n-wB; if(!wF) break; sumB+=v*h2[v];
+      const mB=sumB/wB, mF=(sum-sumB)/wF, bw=wB*wF*(mB-mF)*(mB-mF); if(bw>best){ best=bw; thr=v; } }
+    let dark=0; for(let i=0;i<n;i++) if(gray[i]<=thr) dark++;
+    const textIsDark = dark <= n/2;                 // the minority class is the digits
+    for(let i=0;i<n;i++){ const isDark = gray[i]<=thr; gray[i] = (isDark===textIsDark) ? 0 : 255; }
+    if(variant===1){                                // thicken black strokes (bridges LCD gaps)
+      const r = Math.max(1, Math.round(k*0.6)), out = new Uint8ClampedArray(gray);
+      for(let y=0;y<h;y++) for(let x=0;x<w;x++){ if(gray[y*w+x]===0) continue;
+        let hit=false; for(let dy=-r;dy<=r&&!hit;dy++){ const yy=y+dy; if(yy<0||yy>=h) continue;
+          for(let dx=-r;dx<=r;dx++){ const xx=x+dx; if(xx<0||xx>=w) continue; if(gray[yy*w+xx]===0){ hit=true; break; } } }
+        if(hit) out[y*w+x]=0; }
+      gray.set(out);
+    }
+  } else {                                           // variant 2: keep greyscale, make text dark
+    let mean=0; for(let i=0;i<n;i++) mean+=gray[i]; mean/=n;
+    if(mean<110) for(let i=0;i<n;i++) gray[i]=255-gray[i];
+  }
+  for(let i=0,p=0;i<n;i++,p+=4){ d[p]=d[p+1]=d[p+2]=gray[i]; d[p+3]=255; }
+  g.putImageData(img,0,0);
+  const o = document.createElement("canvas"); o.width = w+pad*2; o.height = h+pad*2;
+  const og = o.getContext("2d"); og.fillStyle="#fff"; og.fillRect(0,0,o.width,o.height); og.drawImage(c,pad,pad);
+  return o;
+}
+/* Re-order recognised words row by row (top→bottom, left→right) so L1/L2/L3 stay in sequence. */
+function orderedOcrText(data){
+  const words = (data.words||[]).filter(w=>w && w.text && w.bbox);
+  if(!words.length) return data.text||"";
+  words.sort((a,b)=>(a.bbox.y0+a.bbox.y1)/2-(b.bbox.y0+b.bbox.y1)/2);
+  const rows=[]; 
+  words.forEach(w=>{ const cy=(w.bbox.y0+w.bbox.y1)/2, hh=Math.max(8,w.bbox.y1-w.bbox.y0);
+    const row = rows.find(r=>Math.abs(r.cy-cy) < hh*0.6);
+    if(row){ row.w.push(w); row.cy=(row.cy*(row.w.length-1)+cy)/row.w.length; } else rows.push({cy,w:[w]}); });
+  rows.sort((a,b)=>a.cy-b.cy);
+  return rows.map(r=>r.w.sort((a,b)=>a.bbox.x0-b.bbox.x0).map(w=>w.text).join(" ")).join("\n");
+}
+function scoreCandidates(nums, def){
+  const inR = nums.filter(n=>def.ranges.some(r=>n>=r[0]&&n<=r[1])).length;
+  return Math.min(inR, def.fields.length)*10 + Math.min(nums.length, def.fields.length);
+}
+async function recognizeVariant(canvas, variant, psm){
+  const wk = await ensureOcrEngine(setOcrStatus);
+  await wk.setParameters({ tessedit_pageseg_mode: String(psm||6) });
+  const { data } = await wk.recognize(preprocessForOcr(canvas, variant));
+  return orderedOcrText(data);
+}
+let ocrTick = 0;
+async function offlineRead(canvas, thorough){
+  const def = GROUP_DEFS[ocrTarget.section][ocrQueue[ocrQueueIdx]], need = def.fields.length;
+  const plan = thorough ? [[0,6],[1,6],[0,11],[2,6]] : [[ocrTick++%2, 6]];
+  let best = {nums:[], score:-1};
+  for(const [v,psm] of plan){
+    const text = await recognizeVariant(canvas, v, psm);
+    const nums = pickBestNumbers(extractNumbers(text, def.unitHint), def.ranges, need), sc = scoreCandidates(nums, def);
+    if(sc>best.score) best={nums,score:sc};
+    if(nums.length===need && nums.every(n=>def.ranges.some(r=>n>=r[0]&&n<=r[1]))) break;
+  }
+  return best.nums;
+}
+
+/* ---- AI vision read (uses the OCR prompt supplied for this app) ---- */
+function buildAiPrompt(def){
+  const rng = def.ranges.map((r,i)=>`${def.labels[i]}: ${r[0]}–${r[1]}`).join(", ");
+  return `You are an expert OCR engine specializing in transcribing industrial equipment and UPS digital displays.
+
+Analyze the attached image of the UPS / STS display screen. Because digital screens often have missing LED/LCD segments, glare, or low contrast, use context clues to determine the correct numerical values.
+
+<instructions>
+1. Extract the electrical metrics shown on the screen.
+2. Focus specifically on this group: "${def.label}" — ${def.fields.length} value(s), in this exact order: ${def.labels.join(", ")}.${def.unitHint?` These readings are in ${def.unitHint}.`:""}
+3. Identify the labels next to or above the numbers to make sure each value belongs to the right field. The image may also show other columns, rows or a clock — ignore anything that is not part of the requested group.
+4. If a digit has a missing or dim segment (e.g. a '7' looking like a '1'), correct it using context (the other phases usually read within a few volts of each other). Plausible ranges for this group — ${rng}.
+5. Do NOT replace a clearly readable number with a typical or nominal value, even if it looks abnormal: a real out-of-range reading must be reported as read. If you had to guess or correct any digit, or a value is hard to see, add its position (0-based) to "uncertain". If a value is not visible, use null — never invent one.
+6. Output strictly one JSON object. No conversational text, explanations or markdown.
+</instructions>
+
+<output_schema>
+{
+  "values": [${def.labels.map(()=>"number or null").join(", ")}],
+  "unit": "V | A | % | kVA | kW | min | Hz | null",
+  "uncertain": [indices of values you are not sure about],
+  "other_metrics": { "key": "value" },
+  "notes": "short note, or empty string"
+}
+</output_schema>`;
+}
+function aiCropBase64(canvas){
+  const MAX = 1280, k = Math.min(1, MAX/Math.max(canvas.width, canvas.height));
+  const c = document.createElement("canvas"); c.width = Math.max(1,Math.round(canvas.width*k)); c.height = Math.max(1,Math.round(canvas.height*k));
+  c.getContext("2d").drawImage(canvas,0,0,c.width,c.height);
+  return c.toDataURL("image/jpeg",0.92).split(",")[1];
+}
+async function aiRead(canvas){
+  const def = GROUP_DEFS[ocrTarget.section][ocrQueue[ocrQueueIdx]];
+  const ctl = new AbortController(), timer = setTimeout(()=>ctl.abort(), 30000);
+  let resp;
+  try{
+    resp = await fetch("https://api.anthropic.com/v1/messages", {
+      method:"POST", signal:ctl.signal,
+      headers:{ "content-type":"application/json", "x-api-key":OCR_CFG.key, "anthropic-version":"2023-06-01", "anthropic-dangerous-direct-browser-access":"true" },
+      body: JSON.stringify({ model: OCR_CFG.model||OCR_DEFAULT_MODEL, max_tokens: 500,
+        messages:[{ role:"user", content:[
+          { type:"image", source:{ type:"base64", media_type:"image/jpeg", data: aiCropBase64(canvas) } },
+          { type:"text", text: buildAiPrompt(def) } ] }] })
+    });
+  } finally { clearTimeout(timer); }
+  if(!resp.ok){
+    let msg=""; try{ const j=await resp.json(); msg=(j.error&&j.error.message)||""; }catch(e){}
+    const err = new Error(resp.status===401 ? "The API key was rejected (401)." : resp.status===429 ? "Rate limit or credit problem (429)." : `AI request failed (${resp.status}). ${msg}`);
+    err.status = resp.status; throw err;
+  }
+  const j = await resp.json();
+  const text = (j.content||[]).map(b=>b.type==="text"?b.text:"").join("");
+  const m = text.match(/\{[\s\S]*\}/);
+  if(!m) throw new Error("The AI reply wasn't JSON.");
+  const o = JSON.parse(m[0]);
+  let vals = Array.isArray(o.values) ? o.values : [];
+  vals = def.fields.map((_,i)=>{ const v = vals[i]; const n = (v===null||v===undefined||v==="") ? null : parseFloat(String(v).replace(/[^\d.\-]/g,"")); return (n===null||isNaN(n)) ? null : n; });
+  const unc = new Set((Array.isArray(o.uncertain)?o.uncertain:[]).map(Number).filter(i=>Number.isInteger(i)));
+  vals.forEach((v,i)=>{ if(v===null) unc.add(i); else if(!def.ranges.some(r=>v>=r[0]&&v<=r[1])) unc.add(i); });
+  return { values:vals, uncertain:[...unc], notes:String(o.notes||"") };
+}
+
+/* ---- settings modal ---- */
+function openOcrSettings(){
+  const esc2 = s=>String(s).replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;");
+  const { backdrop, close } = showFormModal("OCR settings",
+    "<b>AI vision</b> sends the framed photo of the display to Claude and is far better than offline OCR at LCD/LED digits. It needs internet and your own Anthropic API key. The key stays on this device only (it is not included in backups or presets) — use a key with a low spend limit. <b>Offline</b> uses the built-in Tesseract engine.",
+    `<div class="field-group"><label>Engine</label><select class="cell-input" id="ocrCfgEngine" style="width:100%"><option value="ai" ${OCR_CFG.engine==="ai"?"selected":""}>🤖 AI vision (needs key + internet)</option><option value="offline" ${OCR_CFG.engine!=="ai"?"selected":""}>🔤 Offline OCR (Tesseract)</option></select></div>
+     <div class="field-group"><label>Anthropic API key</label><input type="password" class="cell-input" id="ocrCfgKey" style="width:100%;text-align:left" autocomplete="off" placeholder="sk-ant-…" value="${esc2(OCR_CFG.key)}"></div>
+     <div class="field-group"><label>Model</label><input type="text" class="cell-input" id="ocrCfgModel" list="ocrModels" style="width:100%;text-align:left" value="${esc2(OCR_CFG.model||OCR_DEFAULT_MODEL)}"><datalist id="ocrModels"><option value="claude-sonnet-5-5"><option value="claude-haiku-4-5-20251001"></datalist></div>`,
+    "Save", (bd, closeFn)=>{
+      OCR_CFG.engine = bd.querySelector("#ocrCfgEngine").value;
+      OCR_CFG.key = bd.querySelector("#ocrCfgKey").value.trim();
+      OCR_CFG.model = bd.querySelector("#ocrCfgModel").value.trim() || OCR_DEFAULT_MODEL;
+      saveOcrCfg(); closeFn(); updateEngineUi();
+      if(OCR_CFG.engine==="ai" && !OCR_CFG.key) showInfoModal("No API key yet","AI vision stays off until a key is saved — offline OCR will be used.");
+    });
+}
+window.openOcrSettings = openOcrSettings;
+document.getElementById("ocrEngineBtn").addEventListener("click", ()=>{
+  if(!OCR_CFG.key){ openOcrSettings(); return; }
+  OCR_CFG.engine = ocrEngine()==="ai" ? "offline" : "ai"; saveOcrCfg();
+  if(ocrEngine()==="ai"){ stopAutoScanLoop(); setOcrStatus("AI vision on — frame the digits, then tap 🤖 Read with AI"); }
+  else { ensureOcrEngine(setOcrStatus).catch(()=>{}); startAutoScanLoop(); setOcrStatus("Offline OCR on — auto-scanning…"); }
+  updateEngineUi();
+});
+document.getElementById("ocrEngineBtn").addEventListener("contextmenu", e=>{ e.preventDefault(); openOcrSettings(); });
+
 async function attemptAutoScan(){
-  if(ocrScanning || !ocrWorker) return;
+  if(ocrScanning || !ocrWorker || ocrEngine()==='ai') return;
   const canvas = grabReticleFrame();
   if(!canvas) return;
   ocrScanning = true;
   try{
-    const { data } = await ocrWorker.recognize(canvas);
     const def = GROUP_DEFS[ocrTarget.section][ocrQueue[ocrQueueIdx]];
-    const raw = extractNumbers(data.text, def.unitHint);
     const expected = def.fields.length;
-    const candidates = pickBestNumbers(raw, def.ranges, expected);
+    const candidates = await offlineRead(canvas, false);
     if(candidates.length === expected){
       ocrConfidenceReadings.push(candidates);
       if(ocrConfidenceReadings.length > 2) ocrConfidenceReadings.shift();
@@ -2964,17 +3173,41 @@ function lockAndReview(numbers){
   showOcrReview(numbers);
 }
 
-function showOcrReview(numbers){
+function showOcrReview(numbers, uncertain, hint){
   const section = ocrTarget.section;
   const def = GROUP_DEFS[section][ocrQueue[ocrQueueIdx]];
   const grid = document.getElementById("ocrReviewGrid");
   grid.innerHTML = def.labels.map((label,i)=>{
-    const v = (numbers[i]!==undefined) ? numbers[i] : "";
-    return `<div class="ocr-review-field"><label>${label}</label><input type="number" step="0.1" class="cell-input" data-ocr-idx="${i}" value="${v}"></div>`;
+    const v = (numbers[i]!==undefined && numbers[i]!==null) ? numbers[i] : "";
+    const unc = (uncertain ? uncertain.includes(i) : (v!=="" && !def.ranges.some(r=>v>=r[0]&&v<=r[1]))) || v==="";
+    return `<div class="ocr-review-field"><label>${label}</label><input type="number" step="0.1" class="cell-input ${unc?'uncertain':''}" data-ocr-idx="${i}" value="${v}"></div>`;
   }).join("");
+  const hEl = document.getElementById("ocrReviewHint");
+  const anyUnc = grid.querySelector("input.uncertain");
+  hEl.textContent = hint || (anyUnc ? "Amber = unsure or empty — compare with the display and fix before confirming." : "Check the numbers against the display, then confirm.");
+  hEl.classList.toggle("warn", !!anyUnc);
   document.getElementById("ocrReview").style.display = "block";
   document.getElementById("ocrCaptureBtn").style.display = "none";
   document.getElementById("ocrConfirmBtn").style.display = "";
+}
+async function readCapturedCanvas(canvas){
+  const def = GROUP_DEFS[ocrTarget.section][ocrQueue[ocrQueueIdx]];
+  if(ocrEngine()==="ai"){
+    try{
+      setOcrStatus("Asking AI to read the display…");
+      const r = await aiRead(canvas);
+      stopAutoScanLoop(); document.getElementById("ocrReticle").classList.add("locked");
+      showOcrReview(r.values, r.uncertain, r.notes ? "AI: "+r.notes : "");
+      return;
+    }catch(e){
+      console.error(e);
+      const why = e.name==="AbortError" ? "AI request timed out." : (e.status ? e.message : "Couldn't reach the AI (no internet?).");
+      setOcrStatus(why+" Falling back to offline OCR…");
+      showInfoModal("AI read failed", why+" I'll try the offline OCR instead; check the values carefully.");
+    }
+  }
+  const nums = await offlineRead(canvas, true);
+  stopAutoScanLoop(); showOcrReview(nums);
 }
 
 function advanceOcrQueue(){
@@ -3004,11 +3237,7 @@ document.getElementById("ocrCaptureBtn").addEventListener("click", async ()=>{
   const btn = document.getElementById("ocrCaptureBtn");
   const done = setBusy(btn, "⏳ Reading…");
   try{
-    await ensureOcrEngine(setOcrStatus);
-    const { data } = await ocrWorker.recognize(canvas);
-    stopAutoScanLoop();
-    const def = GROUP_DEFS[ocrTarget.section][ocrQueue[ocrQueueIdx]];
-    showOcrReview(pickBestNumbers(extractNumbers(data.text, def.unitHint), def.ranges, def.fields.length));
+    await readCapturedCanvas(canvas);
   }catch(e){
     console.error(e);
     stopAutoScanLoop();
@@ -4782,6 +5011,7 @@ document.getElementById("btnMoreTools").addEventListener("click", ()=>{
   const logOnly = [
     { label: ALERTS_ENABLED ? "🔔 Alarm alerts: ON — tap to turn off" : "🔕 Alarm alerts: off — tap to turn on", onClick: ()=>{ toggleAlerts(); } },
     { label: "📈 View trend history", onClick: ()=>{ showTrendsModal(); } },
+    { label: "🤖 OCR settings (AI vision)", onClick: ()=>{ openOcrSettings(); } },
     { label: "📊 Export Excel (template layout)", onClick: ()=>{ exportExcelTemplate(); } },
     { label: "⬇ Export readings as CSV", onClick: ()=>{ exportCsv(); } },
     { divider:true },
