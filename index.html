@@ -4316,7 +4316,8 @@ function pickFormatAndFit(canvasW, canvasH){
 
 async function buildPdfBlob(onProgress, mode){
   mode = mode || "log";
-  if(mode !== "battery") return buildTemplatePdfBlob(onProgress);
+  const isBatt = (mode === "battery" || mode === "battery-summary");
+  if(!isBatt) return buildTemplatePdfBlob(onProgress);
   await ensurePdfLibs();
   await ensureFontsReady();
   const { jsPDF } = window.jspdf;
@@ -4332,12 +4333,14 @@ async function buildPdfBlob(onProgress, mode){
   // reuse the exact same two-pass capture/paginate pipeline as the
   // room log, regardless of which view the user is currently looking at.
   let tempHost = null;
-  const panels = (mode === "battery")
+  const panels = isBatt
     ? (()=>{
         tempHost = document.createElement("div");
         tempHost.style.position = "fixed"; tempHost.style.left = "-99999px"; tempHost.style.top = "0";
         document.body.appendChild(tempHost);
-        return buildBatteryReportPages().map(html=>{
+        let pages = buildBatteryReportPages();
+        if(mode === "battery-summary") pages = pages.slice(0,1);
+        return pages.map(html=>{
           const div = document.createElement("div");
           div.className = "room-panel";
           div.innerHTML = html;
@@ -4361,11 +4364,15 @@ async function buildPdfBlob(onProgress, mode){
       const restoreOverlay = applyExportOverlay(panel);
       // eslint-disable-next-line no-await-in-loop
       const canvas = await window.html2canvas(panel, {
-        backgroundColor:"#ffffff", scale:2, windowWidth:CAPTURE_WIDTH, useCORS:true
+        backgroundColor:"#ffffff", scale:(isBatt?1.5:2), windowWidth:CAPTURE_WIDTH, useCORS:true
       });
       restoreOverlay();
       panel.style.width = prevWidth;
-      captures.push({ dataUrl: canvas.toDataURL("image/jpeg", 0.9), w: canvas.width, h: canvas.height });
+      const cw = canvas.width, ch = canvas.height;
+      captures.push({ dataUrl: canvas.toDataURL("image/jpeg", isBatt?0.85:0.9), w: cw, h: ch });
+      canvas.width = canvas.height = 0;                      // hand the memory back (matters on phones with many pages)
+      // eslint-disable-next-line no-await-in-loop
+      await new Promise(r=>setTimeout(r,20));
     }
   } finally {
     panels.forEach(p=>p.classList.remove("capture-active"));
@@ -4397,7 +4404,7 @@ async function buildPdfBlob(onProgress, mode){
 }
 
 function pdfFilename(mode){
-  const prefix = mode === "battery" ? "Battery-Leak-Report-" : "MUPS-Watch-";
+  const prefix = (mode === "battery" || mode === "battery-summary") ? (mode==="battery-summary" ? "Battery-Leak-Summary-" : "Battery-Leak-Report-") : "MUPS-Watch-";
   return prefix + new Date().toISOString().slice(0,10) + ".pdf";
 }
 
@@ -4608,11 +4615,39 @@ function showFormModal(title, descHtml, fieldsHtml, primaryLabel, onSubmit){
   return { backdrop, close };
 }
 
-async function printPdfNow(){
+const IS_MOBILE = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+function pdfProgress(btn){ return (step,total,phase)=>{ btn.innerHTML = phase==="capturing" ? `⏳ Capturing ${step}/${total}…` : `⏳ Laying out ${step}/${total}…`; }; }
+function saveBlobAs(blob, filename){
+  const url = URL.createObjectURL(blob), a = document.createElement("a");
+  a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url), 60000);
+}
+function pdfErrorModal(e){
+  const msg = (e && e.message) ? e.message : String(e||"unknown error");
+  const libs = /failed to load|Failed to fetch|NetworkError|jspdf|html2canvas/i.test(msg);
+  showInfoModal("Couldn't build the PDF", (libs ? "The PDF engine couldn't be loaded — check your internet connection (needed the first time) and try again." :
+    "Something went wrong while building the pages (" + msg + "). If the report is big, try the one-page summary, or close other apps and retry."));
+}
+async function downloadPdfNow(modeOverride){
+  const mode = modeOverride || VIEW, btn = document.getElementById("btnPrint");
+  const done = setBusy(btn, "⏳ Building PDF…");
+  try{
+    const blob = await buildPdfBlob(pdfProgress(btn), mode);
+    const filename = pdfFilename(mode);
+    saveBlobAs(blob, filename);
+    showInfoModal("PDF saved", `<b>${filename}</b> was saved to your device's Downloads. Open it from there to view, print or send it.`);
+  }catch(e){ console.error(e); pdfErrorModal(e); }
+  finally{ done(); }
+}
+async function printPdfNow(modeOverride){
+  const mode = modeOverride || VIEW;
+  // Android/iOS browsers can't print a PDF from a hidden iframe (it silently does nothing),
+  // so on phones the reliable route is: save the PDF, then print from the PDF viewer.
+  if(IS_MOBILE){ return downloadPdfNow(mode); }
   const btn = document.getElementById("btnPrint");
   const done = setBusy(btn, "⏳ Building PDF…");
   try{
-    const blob = await buildPdfBlob((step,total,phase)=>{ btn.innerHTML = phase==="capturing" ? `⏳ Capturing ${step}/${total}…` : `⏳ Laying out ${step}/${total}…`; }, VIEW);
+    const blob = await buildPdfBlob(pdfProgress(btn), mode);
     const url = URL.createObjectURL(blob);
     const iframe = document.createElement("iframe");
     iframe.style.position = "fixed";
@@ -4627,29 +4662,40 @@ async function printPdfNow(){
     };
   }catch(e){
     console.error(e);
-    showInfoModal("Couldn't build the PDF", "Probably no internet connection to fetch the PDF engine. Falling back to the browser's basic print — some tables may need 'Fit to page' in the print dialog.");
-    window.print();
+    pdfErrorModal(e);
+    if(mode==="log") { try{ window.print(); }catch(_){} }     // plain browser print only makes sense for the room log
   } finally {
     done();
   }
 }
-document.getElementById("btnPrint").addEventListener("click", ()=>{ if(VIEW==="battery") printPdfNow(); else showExportChooser(); });
+function showBatteryExportChooser(){
+  let close=null;
+  const go=fn=>()=>{ if(close) close(); fn(); };
+  close=showModal("Export battery report",
+    "The full report has a summary page plus one rack diagram per unit, so it takes a while to build. The one-page summary is quick.",
+    [ {label:"⬇ Full report — save PDF",cls:"primary",onClick:go(()=>downloadPdfNow("battery"))},
+      {label:"📄 Summary page only — save PDF",cls:"warn",onClick:go(()=>downloadPdfNow("battery-summary"))},
+      {label:"🖨 Full report — print",cls:"ghost",onClick:go(()=>printPdfNow("battery"))},
+      {label:"📤 Share full report",cls:"ghost",onClick:go(()=>shareCurrentPdf("battery"))} ]);
+}
+document.getElementById("btnPrint").addEventListener("click", ()=>{ if(VIEW==="battery") showBatteryExportChooser(); else showExportChooser(); });
 
-async function shareCurrentPdf(){
+async function shareCurrentPdf(modeOverride){
+  const mode = (typeof modeOverride==="string") ? modeOverride : VIEW, isB = mode.indexOf("battery")===0;
   showToast("⏳ Building PDF…", 60000);
   try{
     const blob = await buildPdfBlob((step,total,phase)=>{
       showToast(phase==="capturing" ? `⏳ Capturing ${step}/${total}…` : `⏳ Laying out ${step}/${total}…`, 60000);
-    }, VIEW);
+    }, mode);
     showToast("✓ PDF ready", 1500);
-    const filename = pdfFilename(VIEW);
+    const filename = pdfFilename(mode);
     const file = new File([blob], filename, { type:"application/pdf" });
     if(navigator.canShare && navigator.canShare({ files:[file] })){
       try{
         await navigator.share({
           files:[file],
-          title: VIEW==="battery" ? "Battery Bank Leak Report" : "MUPS Watch Report",
-          text: VIEW==="battery" ? "UPS battery bank leak report" : "UPS & STS monitoring log"
+          title: isB ? "Battery Bank Leak Report" : "MUPS Watch Report",
+          text: isB ? "UPS battery bank leak report" : "UPS & STS monitoring log"
         });
         return;
       }catch(shareErr){
@@ -4675,10 +4721,10 @@ async function shareCurrentPdf(){
   }catch(e){
     console.error(e);
     showToast("", 1);
-    showInfoModal("Couldn't build the PDF", "Check your internet connection (needed the first time, to load the PDF engine) and try again.");
+    pdfErrorModal(e);
   }
 }
-document.getElementById("btnShare")?.addEventListener("click", shareCurrentPdf);
+document.getElementById("btnShare")?.addEventListener("click", ()=>shareCurrentPdf());
 
 const zoomWrap = document.getElementById("zoomWrap");
 const zoomLabel = document.getElementById("zoomLabel");
