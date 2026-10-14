@@ -6,6 +6,7 @@
 // Set the theme before first paint, straight from localStorage, so the
 // page never flashes the default dark theme before switching to a
 // saved light/system preference.
+  //valiente nuyda APSI 3039
 (function(){
   try{
     var t = window.localStorage.getItem("ups_monitor_theme_v1") || "dark";
@@ -27,8 +28,6 @@
      full-screen app (no browser address bar) instead of a bookmark. -->
 <link rel="manifest" id="pwaManifestLink">
 <link rel="apple-touch-icon" id="pwaAppleIcon">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
   :root{
     color-scheme: dark light;
@@ -51,9 +50,9 @@
     --body-glow-1:#101c26;
     --body-glow-2:#1a1420;
     --topbar-1:#0D1319; --topbar-2:#0B1015;
-    --font-display:'Space Grotesk',sans-serif;
-    --font-body:'Inter',sans-serif;
-    --font-mono:'JetBrains Mono',monospace;
+    --font-display:"Segoe UI Variable Display","Segoe UI",system-ui,-apple-system,Roboto,"Helvetica Neue",Arial,sans-serif;
+    --font-body:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    --font-mono:ui-monospace,"Cascadia Mono","SF Mono","Roboto Mono",Consolas,Menlo,monospace;
     --radius:10px;
   }
   /* ---------- Themes ----------
@@ -371,6 +370,122 @@
     margin-top:26px; padding-top:12px; border-top:1px dashed var(--border-soft);
     font-size:10.5px; color:var(--text-faint); font-family:var(--font-mono); line-height:1.6;
   }
+
+
+  /* =====================================================================
+     V11_13 UI REFRESH — presentation only. Everything below uses the
+     existing CSS variables, so all three themes keep working.
+     ===================================================================== */
+  :root{ --shadow:0 1px 2px rgba(0,0,0,.28),0 4px 14px rgba(0,0,0,.18); --nav-h:58px; }
+  html[data-theme="light"]{ --shadow:0 1px 2px rgba(20,40,60,.08),0 3px 10px rgba(20,40,60,.07); }
+  @media (prefers-color-scheme:light){ html[data-theme="system"]{ --shadow:0 1px 2px rgba(20,40,60,.08),0 3px 10px rgba(20,40,60,.07); } }
+  .topbar{ box-shadow:var(--shadow); }
+  .brand .dot{ animation:none; }                                   /* status dot is now static + meaningful */
+  html[data-status="warn"] .brand .dot{ background:var(--amber); box-shadow:0 0 0 3px var(--amber-dim); }
+  html[data-status="crit"] .brand .dot{ background:var(--red); box-shadow:0 0 0 3px var(--red-dim); }
+  button:focus-visible,select:focus-visible,input:focus-visible,textarea:focus-visible,[tabindex]:focus-visible{ outline:2px solid var(--blue); outline-offset:2px; }
+  .btn{ min-height:38px; } .btn:active{ transform:scale(.97); }
+  .tab{ min-height:44px; }
+  .view-switch button{ min-height:36px; padding:0 14px; }
+  .fleet-card,.ups-card{ box-shadow:var(--shadow); }
+  .table-scroll{ -webkit-overflow-scrolling:touch; }
+  table.grid td.eqcell{ position:sticky; left:0; z-index:1; background:var(--panel); }   /* unit name stays visible while scrolling sideways */
+  @keyframes vfade{ from{opacity:.25} to{opacity:1} }
+  .room-panel.active,#dashHost.active,#batteryHost.active{ animation:vfade .16s ease-out; }
+  @media (prefers-reduced-motion:reduce){ *,*::before,*::after{ animation-duration:.01ms !important; transition-duration:.01ms !important; } }
+
+  /* ---------- status badges (symbol + word, so never colour-only) ---------- */
+  .sbadge{ display:inline-flex; align-items:center; gap:5px; font:700 10.5px var(--font-mono); letter-spacing:.04em; padding:3px 9px; border-radius:999px; border:1px solid; white-space:nowrap; }
+  .sbadge i{ font-style:normal; font-size:11px; }
+  .sb-ok{ color:var(--green); background:var(--green-dim); border-color:var(--green); }
+  .sb-warn{ color:var(--amber); background:var(--amber-dim); border-color:var(--amber); }
+  .sb-crit{ color:var(--red); background:var(--red-dim); border-color:var(--red); }
+  .sb-off{ color:var(--text-dim); background:transparent; border-color:var(--text-faint); border-style:dashed; }
+
+  /* ---------- dashboard ---------- */
+  #dashHost{ display:none; } #dashHost.active{ display:block; }
+  .dash-banner{ display:flex; flex-wrap:wrap; align-items:center; gap:8px 12px; padding:12px 14px; margin-bottom:12px; background:var(--panel); border:1px solid var(--border); border-left:5px solid var(--text-faint); border-radius:10px; box-shadow:var(--shadow); }
+  .dash-banner.ok{ border-left-color:var(--green); } .dash-banner.warn{ border-left-color:var(--amber); } .dash-banner.crit{ border-left-color:var(--red); }
+  .dash-banner h2{ margin:0; font:700 16px var(--font-display); }
+  .dash-banner .meta{ margin-left:auto; text-align:right; color:var(--text-dim); font:11.5px/1.5 var(--font-mono); }
+  .dash-kpis{ display:grid; grid-template-columns:repeat(auto-fit,minmax(125px,1fr)); gap:10px; margin-bottom:12px; }
+  .kpi{ background:var(--panel); border:1px solid var(--border-soft); border-radius:10px; padding:10px 12px; box-shadow:var(--shadow); }
+  .kpi .n{ font:700 22px/1.1 var(--font-display); } .kpi .l{ margin-top:3px; font:600 10px var(--font-mono); letter-spacing:.08em; text-transform:uppercase; color:var(--text-dim); }
+  .kpi.crit .n{ color:var(--red); } .kpi.warn .n{ color:var(--amber); } .kpi.ok .n{ color:var(--green); }
+  .dash-actions{ display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px; }
+  .dash-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,430px),1fr)); gap:12px; align-items:start; }
+  .dcard{ background:var(--panel); border:1px solid var(--border-soft); border-radius:10px; box-shadow:var(--shadow); overflow:hidden; }
+  .dcard-h{ display:flex; flex-wrap:wrap; align-items:center; gap:4px 10px; padding:10px 12px; border-bottom:1px solid var(--border-soft); }
+  .dcard-h h3{ margin:0; font:700 14px var(--font-display); }
+  .dcard-h .sub{ flex-basis:100%; order:3; color:var(--text-dim); font:11px var(--font-mono); }
+  .dcard-h .sbadge{ margin-left:auto; }
+  .urow{ display:grid; grid-template-columns:minmax(84px,1fr) auto minmax(0,1.5fr); gap:6px 10px; align-items:center; width:100%; min-height:44px; padding:6px 12px; text-align:left; background:transparent; color:var(--text); border:0; border-bottom:1px solid var(--border-soft); font:12.5px var(--font-mono); cursor:pointer; }
+  .urow:hover{ background:var(--panel-3); } .urow.crit{ box-shadow:inset 4px 0 0 var(--red); } .urow.warn{ box-shadow:inset 4px 0 0 var(--amber); }
+  .urow .m{ color:var(--text-dim); text-align:right; font-size:11.5px; }
+  .dsec{ padding:7px 12px 3px; font:700 10px var(--font-mono); letter-spacing:.1em; text-transform:uppercase; color:var(--text-faint); }
+  .sts-chips{ display:flex; flex-wrap:wrap; gap:6px; padding:6px 12px 12px; }
+  .schip{ display:inline-flex; align-items:center; gap:5px; min-height:34px; padding:0 10px; background:var(--panel-3); color:var(--text); border:1px solid var(--border); border-radius:8px; font:600 11.5px var(--font-mono); cursor:pointer; }
+  .schip.crit{ border-color:var(--red); color:var(--red); } .schip.warn{ border-color:var(--amber); color:var(--amber); } .schip.off{ border-style:dashed; color:var(--text-dim); }
+  .dcard-f{ display:flex; flex-wrap:wrap; align-items:center; gap:8px; padding:9px 12px; background:var(--panel-3); font:11.5px var(--font-mono); color:var(--text-dim); }
+  .dcard-f .btn{ margin-left:auto; min-height:34px; padding:5px 12px; }
+  .batt-card{ display:flex; align-items:center; gap:14px; padding:12px; }
+  .batt-card .ring{ width:56px; height:56px; flex:none; }
+  .batt-card .t{ font:12.5px/1.6 var(--font-mono); color:var(--text-dim); } .batt-card .t b{ color:var(--text); }
+
+  /* ---------- bottom navigation (phones) ---------- */
+  .bottomnav{ display:none; }
+  body[data-view="dashboard"] .voice-fab, body[data-view="dashboard"] .camera-fab{ display:none !important; }   /* capture tools belong to the log */
+  @media (max-width:760px){
+    .bottomnav{ display:grid; grid-template-columns:repeat(5,1fr); position:fixed; left:0; right:0; bottom:0; z-index:60; background:var(--panel); border-top:1px solid var(--border); padding-bottom:env(safe-area-inset-bottom,0px); box-shadow:0 -4px 14px rgba(0,0,0,.25); }
+    .bottomnav button{ min-height:var(--nav-h); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; background:none; border:0; color:var(--text-dim); font:600 10.5px var(--font-body); }
+    .bottomnav button span{ font-size:19px; line-height:1; }
+    .bottomnav button.on{ color:var(--amber); box-shadow:inset 0 3px 0 var(--amber); background:var(--panel-3); }
+    .stage{ padding:0 8px calc(var(--nav-h) + env(safe-area-inset-bottom,0px) + 28px); }
+    .zoomwrap{ padding:10px; }
+    .view-switch,.zoomctl,#btnPrint,#btnMoreTools,#btnLoad,.brand small{ display:none !important; }
+    .topbar{ padding:8px 12px; } .brand h1{ font-size:15px; }
+    body .voice-fab, body .camera-fab{ bottom:calc(var(--nav-h) + 14px + env(safe-area-inset-bottom,0px)); }   /* clear the nav bar */
+    .dash-banner .meta{ margin-left:0; text-align:left; flex-basis:100%; }
+    .urow{ grid-template-columns:1fr auto; } .urow .m{ grid-column:1/-1; text-align:left; }
+  }
+  @media (pointer:coarse){ .modal-actions .btn,.anchored-menu button{ min-height:46px; } }
+  @media print{ .bottomnav,#dashHost{ display:none !important; } }
+
+
+  /* ---------- V11_14: unit details, register, guide ---------- */
+  .modal-card{ max-height:92vh; overflow-y:auto; } .modal-card.wide{ max-width:680px; }
+  .asset-form{ display:grid; grid-template-columns:1fr 1fr; gap:8px; } .asset-form .full{ grid-column:1/-1; }
+  @media (max-width:340px){ .asset-form{ grid-template-columns:1fr; } }
+  .modal-card .modal-actions{ position:sticky; bottom:0; background:var(--panel-2); padding:8px 0 4px; z-index:2; }   /* Save stays reachable in long forms */
+  .asset-form textarea.cell-input{ width:100%; min-height:70px; text-align:left; resize:vertical; }
+  .asset-links{ display:flex; flex-wrap:wrap; gap:6px; margin:10px 0 4px; } .asset-links .btn{ min-height:36px; padding:5px 10px; white-space:normal; text-align:left; }
+  .assetbtn{ display:inline-flex; align-items:center; justify-content:center; width:18px; height:18px; margin-left:4px; border-radius:4px; border:1px solid var(--border-soft); background:transparent; color:var(--text-faint); font-size:10px; line-height:1; cursor:pointer; vertical-align:middle; }
+  .assetbtn:hover{ color:var(--text); border-color:var(--text-faint); } .assetbtn.has{ background:var(--green-dim); color:var(--green); border-color:var(--green); }
+  .asset-search{ width:100%; text-align:left !important; margin-bottom:8px; }
+  .arow{ display:flex; align-items:center; gap:6px; border-bottom:1px solid var(--border-soft); }
+  .arow-main{ flex:1; min-width:0; display:grid; gap:2px; text-align:left; background:none; border:0; color:var(--text); padding:8px 4px; min-height:44px; font:12px var(--font-mono); cursor:pointer; }
+  .arow-main b{ font:700 13px var(--font-display); } .arow-main .adesc{ color:var(--text-dim); overflow:hidden; text-overflow:ellipsis; }
+  .arow-main .awarn{ color:var(--amber); font-weight:700; }
+  .alinks{ display:flex; flex:none; } .alinks a{ display:inline-flex; align-items:center; justify-content:center; min-width:40px; min-height:40px; color:var(--blue); text-decoration:none; font-size:16px; }
+  .detail-asset a{ color:var(--blue); text-decoration:none; margin-right:10px; }
+  .help details{ border:1px solid var(--border-soft); border-radius:8px; margin-bottom:8px; background:var(--panel); }
+  .help summary{ cursor:pointer; padding:10px 12px; font-weight:700; min-height:44px; display:flex; align-items:center; }
+  .help .hb{ padding:0 12px 10px; font-size:13px; line-height:1.55; color:var(--text-dim); } .help .hb b{ color:var(--text); }
+  .help .hb ul{ margin:6px 0; padding-left:18px; } .help .hb a{ color:var(--blue); }
+
+
+  /* ---------- V11_15: calculated / auto-filled cells ---------- */
+  .cell-input.calc{ background:transparent; border-style:dashed; color:var(--text-dim); cursor:default; }
+  .cell-input.calc:focus{ box-shadow:none; border-color:var(--border-soft); }
+  .cell-input.autofill{ border-style:dashed; }
+  tr.pair-start td{ border-top:2px solid var(--border); } td.pairtot{ vertical-align:middle; }
+  /* ---------- V11_18: unit name keeps the full row; the ℹ sits beside the capacity ---------- */
+  table.grid td.eqcell{ min-width:100px; max-width:100px; }
+  .eq-sub{ display:flex; align-items:center; gap:4px; margin-top:1px; }
+  .eq-sub .cap-input{ flex:1; min-width:0; }
+  .eq-sub .assetbtn{ flex:none; margin:0; }
+
+  .calc-tag{ margin-left:6px; font:600 9px var(--font-mono); letter-spacing:.04em; color:var(--text-dim); text-transform:none; white-space:nowrap; }
 
   /* ---------- Print (fallback path only — used if the PDF libraries
      can't be loaded, e.g. no internet on first use). The primary
@@ -847,7 +962,8 @@
   </div>
   <div class="toolbar-actions">
     <div class="view-switch no-print" id="viewSwitch">
-      <button data-view="log" class="on">🖥 Log</button>
+      <button data-view="dashboard">📊 Dashboard</button>
+      <button data-view="log" class="on">🖥 Logs</button>
       <button data-view="battery">🔋 Batteries</button>
     </div>
     <span class="savebadge" id="saveBadge">not saved yet</span>
@@ -866,6 +982,7 @@
 
 <div class="stage">
   <div class="zoomwrap" id="zoomWrap">
+    <div id="dashHost" aria-live="polite"></div>
     <div id="roomsHost"></div>
 
     <div id="batteryHost">
@@ -885,6 +1002,7 @@
             <div>
               <h2 id="detailUid">—</h2>
               <div class="sub" id="detailSub">—</div>
+              <div class="sub detail-asset" id="detailAsset"></div>
             </div>
           </div>
           <div class="detail-meta-row">
@@ -920,6 +1038,14 @@
     </div>
   </div>
 </div>
+
+<nav class="bottomnav no-print" id="bottomNav" aria-label="Main navigation">
+  <button type="button" data-nav="dashboard"><span aria-hidden="true">📊</span>Dashboard</button>
+  <button type="button" data-nav="log"><span aria-hidden="true">🖥</span>Logs</button>
+  <button type="button" data-nav="battery"><span aria-hidden="true">🔋</span>Batteries</button>
+  <button type="button" data-nav="reports"><span aria-hidden="true">🖨</span>Reports</button>
+  <button type="button" data-nav="settings" id="navSettings"><span aria-hidden="true">⚙</span>Settings</button>
+</nav>
 
 <button id="btnVoice" class="voice-fab no-print" title="Tap a reading field first, then tap here to start voice entry">🎤</button>
 <div id="voiceHeardToast" class="voice-toast no-print"></div>
@@ -1909,6 +2035,7 @@ function num(path, val, opts){
   if(opts.narrow) cls.push("narrow");
   const a = opts.spec ? alarmClass(opts.spec, val, opts.effSpec) : "";
   if(a) cls.push(a);
+  if(opts.auto) cls.push("autofill");
   const v = (val===null||val===undefined) ? "" : val;
   return `<input class="${cls.join(' ')}" type="number" inputmode="decimal" step="0.1"
             data-path="${path}" data-kind="num" ${opts.spec?`data-spec="${opts.spec}"`:""}
@@ -1924,10 +2051,10 @@ function timeInput(path, val, opts){
   const cls = "cell-input time-input" + (opts.wide ? "" : " narrow");
   return `<input class="${cls}" type="time" data-path="${path}" data-kind="text" value="${v}">`;
 }
-function statusSelect(path, val){
+function statusSelect(path, val, auto){
   const opts = ["","NORMAL","ABNORMAL","CHARGING","OFF"];
   const v = val || "";
-  const cls = "cell-input " + (v==="NORMAL"?"st-normal":v==="ABNORMAL"?"st-abnormal":v==="CHARGING"?"st-charging":v==="OFF"?"st-off":"");
+  const cls = "cell-input " + (auto?"autofill ":"") + (v==="NORMAL"?"st-normal":v==="ABNORMAL"?"st-abnormal":v==="CHARGING"?"st-charging":v==="OFF"?"st-off":"");
   return `<select class="${cls}" data-path="${path}" data-kind="text">
     ${opts.map(o=>`<option value="${o}" ${o===v?"selected":""}>${o||"—"}</option>`).join("")}
   </select>`;
@@ -1951,13 +2078,13 @@ function renderUpsTable(roomKey, room){
   const effSpec = getEffectiveSpec(roomKey);
   const rows = room.ups.map((u,i)=>{
     const base = `${roomKey}.ups.${i}`;
-    return `<tr>
+    return `<tr class="${i%2===0?'pair-start':''}">
       <td class="eqcell">
         <div class="eq-name-row">
           ${txt(base+'.n', u.n, 'eqname-input','Unit ID')}
           <button class="rowdel no-print" title="Remove this UPS row" onclick="removeUpsRow('${roomKey}',${i})">×</button>
         </div>
-        <input class="cap-input" type="text" data-path="${base}.c" data-kind="text" value="${u.c||''}" placeholder="capacity">
+        <div class="eq-sub"><input class="cap-input" type="text" data-path="${base}.c" data-kind="text" value="${u.c||''}" placeholder="capacity"><button class="assetbtn no-print ${hasAsset(u.n)?'has':''}" data-rk="${roomKey}" data-sec="ups" data-i="${i}" title="Unit details: serial no., gateway IP, install date, manual &amp; links" aria-label="Unit details" onclick="openAssetFromLog('${roomKey}','ups',${i})">ℹ</button></div>
       </td>
       <td>${num(base+'.iv.0',u.iv[0],{spec:'upsV',effSpec:effSpec})}</td>
       <td>${num(base+'.iv.1',u.iv[1],{spec:'upsV',effSpec:effSpec})}</td>
@@ -1965,8 +2092,8 @@ function renderUpsTable(roomKey, room){
       <td>${num(base+'.ov.0',u.ov[0],{spec:'upsV',effSpec:effSpec})}</td>
       <td>${num(base+'.ov.1',u.ov[1],{spec:'upsV',effSpec:effSpec})}</td>
       <td>${num(base+'.ov.2',u.ov[2],{spec:'upsV',effSpec:effSpec})}</td>
-      <td>${num(base+'.lk',u.lk,{narrow:true})}</td>
-      <td>${num(base+'.tl',u.tl,{narrow:true})}</td>
+      <td>${calcNum(base+'.lk',u.lk,'Calculated: sum of this UPS\'s 5 Universal Power Module values. Not editable.')}</td>
+      ${i%2===0 ? `<td class="pairtot" rowspan="${i+1<room.ups.length?2:1}">${calcNum(base+'.tl',u.tl,'Calculated: Load kVA of '+(u.n||'this UPS')+(room.ups[i+1]?' + '+(room.ups[i+1].n||'its pair'):'')+' (paralleled pair). Not editable.')}</td>` : ''}
       <td>${num(base+'.upm.0',u.upm[0],{narrow:true})}</td>
       <td>${num(base+'.upm.1',u.upm[1],{narrow:true})}</td>
       <td>${num(base+'.upm.2',u.upm[2],{narrow:true})}</td>
@@ -1991,8 +2118,8 @@ function renderUpsTable(roomKey, room){
         <th rowspan="2">Equipment</th>
         <th colspan="3">Input Voltage (±10%)${grpCheck('ups','iv')}</th>
         <th colspan="3">Output Voltage (±10%)${grpCheck('ups','ov')}</th>
-        <th rowspan="2">Load<br>kVA</th>
-        <th rowspan="2">Total<br>kVA</th>
+        <th rowspan="2">Load<br>kVA<br><span class="calc-tag" title="Calculated: sum of the 5 Universal Power Module values. Not editable.">= UPM sum</span></th>
+        <th rowspan="2">Total<br>kVA<br><span class="calc-tag" title="Calculated: sum of the Load kVA of the two paralleled UPS. Not editable.">= pair sum</span></th>
         <th colspan="5">Universal Power Module${grpCheck('ups','upm')}</th>
         <th rowspan="2">Batt<br>VDC≈520${grpCheck('ups','bvrt','+Runtime')}</th>
         <th rowspan="2">Runtime<br>(min)</th>
@@ -2022,7 +2149,7 @@ function renderStsTable(roomKey, room){
           ${txt(base+'.n', s.n, 'eqname-input','Unit ID')}
           <button class="rowdel no-print" title="Remove this STS row" onclick="removeStsRow('${roomKey}',${i})">×</button>
         </div>
-        <input class="cap-input" type="text" data-path="${base}.c" data-kind="text" value="${s.c||''}" placeholder="capacity">
+        <div class="eq-sub"><input class="cap-input" type="text" data-path="${base}.c" data-kind="text" value="${s.c||''}" placeholder="capacity"><button class="assetbtn no-print ${hasAsset(s.n)?'has':''}" data-rk="${roomKey}" data-sec="sts" data-i="${i}" title="Unit details: serial no., gateway IP, install date, manual &amp; links" aria-label="Unit details" onclick="openAssetFromLog('${roomKey}','sts',${i})">ℹ</button></div>
       </td>
       <td>${num(base+'.s1.0',s.s1[0],{spec:'stsSrc',effSpec:effSpec})}</td>
       <td>${num(base+'.s1.1',s.s1[1],{spec:'stsSrc',effSpec:effSpec})}</td>
@@ -2033,9 +2160,9 @@ function renderStsTable(roomKey, room){
       <td>${num(base+'.lp.0',s.lp[0],{narrow:true})}</td>
       <td>${num(base+'.lp.1',s.lp[1],{narrow:true})}</td>
       <td>${num(base+'.lp.2',s.lp[2],{narrow:true})}</td>
-      <td>${num(base+'.ic.0',s.ic[0],{narrow:true})}</td>
-      <td>${num(base+'.ic.1',s.ic[1],{narrow:true})}</td>
-      <td>${num(base+'.ic.2',s.ic[2],{narrow:true})}</td>
+      <td>${calcNum(base+'.ic.0',s.ic[0])}</td>
+      <td>${calcNum(base+'.ic.1',s.ic[1])}</td>
+      <td>${calcNum(base+'.ic.2',s.ic[2])}</td>
       <td>${num(base+'.temp',s.temp,{narrow:true})}</td>
       <td>${num(base+'.fq.0',s.fq[0],{narrow:true,spec:'freq',effSpec:effSpec})}</td>
       <td>${num(base+'.fq.1',s.fq[1],{narrow:true,spec:'freq',effSpec:effSpec})}</td>
@@ -2056,7 +2183,7 @@ function renderStsTable(roomKey, room){
         <th colspan="3">Source 1 (220–240V)${grpCheck('sts','s1')}</th>
         <th colspan="3">Source 2 (220–240V)${grpCheck('sts','s2')}</th>
         <th colspan="3">Load %${grpCheck('sts','lp')}</th>
-        <th colspan="3">Input Current${grpCheck('sts','ic')}</th>
+        <th colspan="3">Input Current<span class="calc-tag" title="Calculated automatically: Load % × 4. Not editable.">= Load % × 4</span></th>
         <th rowspan="2">Temp<br>0–40°C</th>
         <th colspan="2">Freq (±4Hz)</th>
         <th rowspan="2">Time</th>
@@ -2081,12 +2208,12 @@ function renderInspectionTable(roomKey, sectionKey, label, room, list, t1, t2){
     const base = `${roomKey}.${sectionKey}.${i}.insp`;
     return `<tr>
       <td class="eqcell">${u.n || '<span style="color:var(--text-faint)">unassigned</span>'}</td>
-      <td>${statusSelect(base+'.0.cond', u.insp[0].cond)}</td>
-      <td>${num(base+'.0.temp', u.insp[0].temp, {narrow:true})}</td>
-      <td>${statusSelect(base+'.0.disp', u.insp[0].disp)}</td>
-      <td>${statusSelect(base+'.1.cond', u.insp[1].cond)}</td>
-      <td>${num(base+'.1.temp', u.insp[1].temp, {narrow:true})}</td>
-      <td>${statusSelect(base+'.1.disp', u.insp[1].disp)}</td>
+      <td>${statusSelect(base+'.0.cond', u.insp[0].cond, isAuto(sectionKey,u,0,'cond'))}</td>
+      <td>${num(base+'.0.temp', u.insp[0].temp, {narrow:true, auto:isAuto(sectionKey,u,0,'temp')})}</td>
+      <td>${statusSelect(base+'.0.disp', u.insp[0].disp, isAuto(sectionKey,u,0,'disp'))}</td>
+      <td>${statusSelect(base+'.1.cond', u.insp[1].cond, isAuto(sectionKey,u,1,'cond'))}</td>
+      <td>${num(base+'.1.temp', u.insp[1].temp, {narrow:true, auto:isAuto(sectionKey,u,1,'temp')})}</td>
+      <td>${statusSelect(base+'.1.disp', u.insp[1].disp, isAuto(sectionKey,u,1,'disp'))}</td>
     </tr>`;
   }).join("");
   return `<div class="table-scroll"><table class="grid">
@@ -2212,6 +2339,7 @@ function renderRoom(roomKey){
 }
 
 function renderAll(){
+  if(autoSyncAll()) scheduleSave();        // V11_15: derived/auto-filled values are settled before the tables are drawn
   const host = document.getElementById("roomsHost");
   host.innerHTML = ROOM_ORDER.map(k=>`<div class="room-panel ${k===ACTIVE?'active':''}" id="panel-${k}">${renderRoom(k)}</div>`).join("");
   renderTabs();
@@ -2246,6 +2374,7 @@ function renderTabs(){
 function updateSummary(roomKey){
   const panel = document.getElementById("panel-"+roomKey);
   if(!panel) return;
+  refreshStatusDot();
   const alarms = panel.querySelectorAll(".cell-input.alarm").length;
   const warns = panel.querySelectorAll(".cell-input.warn").length;
   const chip = document.getElementById("summary-"+roomKey);
@@ -3326,10 +3455,7 @@ document.getElementById("roomsHost").addEventListener("input", (e)=>{
   }
   setPath(STATE, parts, val);
   const roomKey = parts[0];
-
-  if(parts[1]==="ups" && parts[2]===0 && parts[3]==="cc"){
-    syncAutoChargingDisplay(roomKey, val);
-  }
+  autoOnInput(parts, val, el);            // V11_15: Input Current = Load % × 4, ambient/condition/display auto-fill
 
   const spec = el.getAttribute("data-spec");
   if(spec){
@@ -3679,7 +3805,7 @@ const DEFAULT_BATTERY_UNITS = [
 let BATTERY_ACTIVE = null;    // id of unit currently open in detail view
 let BATTERY_FILTER = "all";   // 'all' | 'leaked'
 let BATTERY_HIGHLIGHT = null; // {bank, cell} or null
-let VIEW = "log";              // 'log' | 'battery'
+let VIEW = "log";              // 'dashboard' | 'log' | 'battery'
 
 function makeCell(){ return {status:"normal", at:null, note:""}; }
 function makeBanks(bankCount, cellsPerBank){
@@ -3754,7 +3880,13 @@ function setView(v){
   document.getElementById("tabs").style.display = (v==="log") ? "" : "none";
   document.getElementById("roomsHost").style.display = (v==="log") ? "" : "none";
   document.getElementById("batteryHost").classList.toggle("active", v==="battery");
+  document.getElementById("dashHost").classList.toggle("active", v==="dashboard");
+  document.querySelectorAll("#bottomNav button[data-nav]").forEach(b=>b.classList.toggle("on", b.getAttribute("data-nav")===v));
+  document.querySelectorAll("#viewSwitch button").forEach(b=>{ if(b.getAttribute("data-view")===v) b.setAttribute("aria-current","page"); else b.removeAttribute("aria-current"); });
   if(v==="battery"){ closeBatteryDetail(); renderBatteryHome(); }
+  if(v==="dashboard"){ renderDashboard(); }
+  document.body.setAttribute("data-view", v);
+  window.scrollTo(0,0);
 }
 document.getElementById("viewSwitch").addEventListener("click",(e)=>{
   const btn = e.target.closest("button[data-view]");
@@ -4017,7 +4149,8 @@ function renderBatteryDetail(){
     <span class="stat-pill ${s.leaked>0?'alarm':'ok'}">${s.leaked} of ${s.total} leaked</span>
     <span class="stat-pill">${s.pct}% healthy</span>
     ${s.noted>0 ? `<span class="stat-pill">${s.noted} cell(s) with comments</span>` : ''}
-    <button class="btn ghost no-print" id="btnConfigureUnit" style="margin-left:auto">⚙ Configure banks/cells</button>
+    <button class="btn ghost no-print" id="btnUnitDetails" style="margin-left:auto">ℹ UPS details</button>
+    <button class="btn ghost no-print" id="btnConfigureUnit">⚙ Configure banks/cells</button>
     ${u.banks.map((bank,i)=>{
       const lk = bank.filter(c=>c.status==="leaked").length;
       return `<span class="stat-pill ${lk>0?'alarm':''}">Bank ${i+1} (${bank.length}): ${lk} leaked</span>`;
@@ -4025,6 +4158,9 @@ function renderBatteryDetail(){
   `;
   const cfgBtn = document.getElementById("btnConfigureUnit");
   if(cfgBtn) cfgBtn.addEventListener("click", ()=> openConfigureModal(u));
+  const detBtn = document.getElementById("btnUnitDetails");
+  if(detBtn) detBtn.addEventListener("click", ()=> openAssetEditor(u.id));
+  document.getElementById("detailAsset").innerHTML = assetSummaryHtml(u.id);
 
   const wrap = document.getElementById("rackWrap");
   wrap.innerHTML = renderRackHTML(u);
@@ -4464,7 +4600,8 @@ function exportCsv(){
 function exportBackup(){
   const backup = {
     kind: "mups-watch-backup", version: 1, exportedAt: new Date().toISOString(),
-    roomOrder: ROOM_ORDER.slice(), state: deepClone(STATE)
+    roomOrder: ROOM_ORDER.slice(), state: deepClone(STATE),
+    assets: deepClone(ASSETS)                       // V11_14: unit details (older backups simply don't have this key)
   };
   downloadTextFile("MUPS-Watch-backup-" + new Date().toISOString().slice(0,10) + ".json", JSON.stringify(backup,null,2), "application/json");
   logAudit(null, "Exported a full backup file.");
@@ -4491,6 +4628,7 @@ function triggerImportBackup(){
           if(!STATE.meta) STATE.meta = { nextRoomNum: computeNextRoomNum() };
           if(!STATE.techRoster || !STATE.techRoster.length) STATE.techRoster = DEFAULT_TECH_ROSTER.slice();
           ensureBatteryBanksOnState();
+          if(backup.assets && typeof backup.assets==="object"){ Object.assign(ASSETS, backup.assets); saveAssets(); }   // merge, never wipe existing details
           if(!ROOM_ORDER.includes(ACTIVE)) ACTIVE = ROOM_ORDER[0];
           logAudit(null, `Imported backup from ${new Date(backup.exportedAt).toLocaleString()}.`);
           renderAll();
@@ -4798,7 +4936,7 @@ function tplModels(){
       loc: uniq(rooms.map(r=>r.location)).join(" / "),
       date: d2s((rooms.find(r=>r.date)||{}).date), time: t2f(rooms[0].time),
       t1: t2f(rooms[0].checkTime1), t2: t2f(rooms[0].checkTime2),
-      ups: rooms.flatMap(r=>r.ups),
+      ups: rooms.flatMap(r=>r.ups.map((u,i)=>Object.assign({},u,{_ri:i}))),
       sts: rooms.flatMap(r=>r.sts).filter(s=>s.n||has(s)).map(s=>Object.assign({},s,{tf:t2f(s.time)})),
       sig:(rooms.find(r=>r.ackSignature)||{}).ackSignature||null, remarks: uniq(rooms.map(r=>r.remarks)).join("  "), ack: uniq(rooms.map(r=>r.ackBy)).join(" / ") };
   });
@@ -4830,12 +4968,12 @@ function tplLayout(m){
     C(r,1,TB.ups+"    "+u.n,{b:1,sz:6,al:"c"}); C(r,2,u.c,LB);
     u.iv.forEach((v,k)=>C(r,3+k,v,fl(N,out(v,380,420))));
     u.ov.forEach((v,k)=>C(r,6+k,v,fl(N,out(v,380,420))));
-    C(r,9,u.lk,fl(N,out(u.lk,null,300)));
+    C(r,9,u.lk,fl(N,out(u.lk,null,300)),1,1,(u.lk!=null && u.upm.some(x=>x!=null)) ? `SUM(K${r}:O${r})` : null);
     u.upm.forEach((v,k)=>C(r,11+k,v,fl(N,out(v,null,60))));
     C(r,16,u.bv,fl(N,out(u.bv,505,555))); C(r,17,u.rt,N);
     C(r,18,u.cc,fl(N,out(u.cc,null,5))); C(r,19,u.rtemp,fl(N,out(u.rtemp,null,22)));
   });
-  for(let i=0;i<nU;i+=2){ const pr=i+1<nU, v=[m.ups[i].lk,pr?m.ups[i+1].lk:null].filter(x=>x!=null);
+  for(let i=0;i<nU;i+=((m.ups[i+1] && m.ups[i+1]._ri===m.ups[i]._ri+1) ? 2 : 1)){ const pr=!!(m.ups[i+1] && m.ups[i+1]._ri===m.ups[i]._ri+1), v=[m.ups[i].lk,pr?m.ups[i+1].lk:null].filter(x=>x!=null);
     const tv=v.length?+v.reduce((a,b)=>a+b,0).toFixed(1):null;
     C(7+i,10,tv,fl(N,out(tv,null,600)),pr?2:1,1,tv==null?null:(pr?`I${7+i}+I${8+i}`:`I${7+i}`)); }
 
@@ -5047,6 +5185,9 @@ function showExportChooser(){
    ========================================================= */
 document.getElementById("btnMoreTools").addEventListener("click", ()=>{
   const commonTail = [
+    { label: "🗂 UPS & STS unit details", onClick: ()=>{ showAssetRegister(); } },
+    { label: "📖 Help & user guide", onClick: ()=>{ showHelpGuide(); } },
+    { divider:true },
     { label: "📤 Share PDF", onClick: ()=>{ shareCurrentPdf(); } },
     { label: "🎨 Change theme (" + (THEMES.find(t=>t.id===THEME)||{}).short + ")", onClick: ()=>{ showThemeModal(); } },
     { label: "📋 View activity log", onClick: ()=>{ showAuditLogModal(); } },
@@ -5063,6 +5204,7 @@ document.getElementById("btnMoreTools").addEventListener("click", ()=>{
     { divider:true },
     { label: "💾 Save as default", onClick: ()=>{ openSavePresetModal(); } },
     { label: "📂 Load default", onClick: ()=>{ openLoadPresetModal(); } },
+    { label: "⭯ Load sample data", onClick: ()=>{ document.getElementById("btnLoad").click(); } },
     { label: "🗑 Clear all readings", onClick: ()=>{ openClearAllConfirm(); } },
     { divider:true }
   ];
@@ -5071,8 +5213,456 @@ document.getElementById("btnMoreTools").addEventListener("click", ()=>{
     { label: "⬇ Export leak/comment report (CSV)", onClick: ()=>{ exportBatteryLeakCsv(); } },
     { divider:true }
   ];
-  showAnchoredMenu(document.getElementById("btnMoreTools"), VIEW==="battery" ? [...batteryOnly, ...commonTail] : [...logOnly, ...commonTail]);
+  const mt = document.getElementById("btnMoreTools");
+  const anchor = (mt.offsetParent !== null) ? mt : document.getElementById("navSettings");   // phones use the bottom-nav Settings button
+  showAnchoredMenu(anchor, VIEW==="battery" ? [...batteryOnly, ...commonTail] : [...logOnly, ...commonTail]);
 });
+
+
+/* =========================================================
+   DASHBOARD (V11_13) — a read-only summary. It reads the same STATE the
+   log uses, and takes alarm/advisory status straight from the classes the
+   log tables already paint (so it always follows each room's own
+   thresholds). Nothing here writes data or changes a threshold.
+   ========================================================= */
+const SBADGE = { ok:["✓","NORMAL","sb-ok"], warn:["▲","WARNING","sb-warn"], crit:["✕","CRITICAL","sb-crit"], off:["○","NOT MONITORED","sb-off"] };
+function sbadge(k, label){ const b=SBADGE[k]; return `<span class="sbadge ${b[2]}"><i aria-hidden="true">${b[0]}</i>${label||b[1]}</span>`; }
+const escH = s=>String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/"/g,"&quot;");
+function dashRows(t){ return t ? [...t.querySelectorAll("tbody tr:not(.addrow-row)")] : []; }
+/* status of one equipment row: reading row + its inspection row */
+function dashRowStatus(trRead, trInsp){
+  const nums = trRead ? [...trRead.querySelectorAll('input[data-kind="num"]')] : [];
+  const hasData = nums.some(i=>i.value!=="");
+  const sel = trInsp ? [...trInsp.querySelectorAll("select")] : [];
+  const inspSet = sel.some(x=>x.value && x.value!=="OFF");
+  if((trRead && trRead.querySelector(".cell-input.alarm")) || sel.some(x=>x.value==="ABNORMAL")) return "crit";
+  if(trRead && trRead.querySelector(".cell-input.warn")) return "warn";
+  return (hasData || inspSet) ? "ok" : "off";
+}
+const WORST = {off:0, ok:1, warn:2, crit:3};
+function dashCollect(){
+  const out = { rooms:[], alarms:0, warns:0, upsTotal:0, upsMon:0, stsTotal:0, stsMon:0 };
+  ROOM_ORDER.forEach(k=>{
+    const room = STATE[k], panel = document.getElementById("panel-"+k); if(!room||!panel) return;
+    const tb = panel.querySelectorAll(".table-scroll");
+    const rU = dashRows(tb[0]), rS = dashRows(tb[1]), iU = dashRows(tb[2]), iS = dashRows(tb[3]);
+    const R = { key:k, room, ups:[], sts:[], worst:"off",
+      alarms: panel.querySelectorAll(".cell-input.alarm").length, warns: panel.querySelectorAll(".cell-input.warn").length };
+    room.ups.forEach((u,i)=>{ const st = dashRowStatus(rU[i], iU[i]); R.ups.push({u, st}); out.upsTotal++; if(st!=="off") out.upsMon++; if(WORST[st]>WORST[R.worst]) R.worst=st; });
+    room.sts.forEach((x,i)=>{ const st = dashRowStatus(rS[i], iS[i]); if(!x.n && st==="off") return; R.sts.push({x, st}); out.stsTotal++; if(st!=="off") out.stsMon++; if(WORST[st]>WORST[R.worst]) R.worst=st; });
+    out.alarms += R.alarms; out.warns += R.warns; out.rooms.push(R);
+  });
+  return out;
+}
+function refreshStatusDot(){
+  let a=0, w=0;
+  document.querySelectorAll(".room-panel").forEach(p=>{ a += p.querySelectorAll(".cell-input.alarm").length; w += p.querySelectorAll(".cell-input.warn").length; });
+  document.documentElement.setAttribute("data-status", a>0 ? "crit" : (w>0 ? "warn" : "ok"));
+  if(typeof VIEW!=="undefined" && VIEW==="dashboard"){ clearTimeout(refreshStatusDot.t); refreshStatusDot.t = setTimeout(renderDashboard, 200); }
+}
+function openRoomInLog(k, focusPath){
+  setView("log");
+  const tab = document.querySelector('.tab[data-room="'+k+'"]'); if(tab) tab.click();
+  if(focusPath){ setTimeout(()=>{ const el = document.querySelector('[data-path="'+focusPath+'"]'); if(el){ el.scrollIntoView({block:"center",behavior:"smooth"}); try{ el.focus({preventScroll:true}); }catch(e){} } }, 60); }
+}
+function renderDashboard(){
+  const host = document.getElementById("dashHost"); if(!host) return;
+  const D = dashCollect(), F = batteryFleetStats();
+  const overall = D.alarms>0 ? "crit" : (D.warns>0 ? "warn" : (D.upsMon+D.stsMon>0 ? "ok" : "off"));
+  const msg = { crit:"Out-of-spec readings need attention", warn:"Advisory readings present", ok:"All monitored equipment within limits", off:"No readings entered yet" }[overall];
+  // latest log entry across rooms (date + time as typed on each room sheet)
+  let last = null; D.rooms.forEach(R=>{ if(R.room.date && (!last || R.room.date >= last.date)) last = {date:R.room.date, time:R.room.time||"", loc:R.room.location}; });
+  const saved = (document.getElementById("saveBadge")||{}).textContent || "";
+  const kpi = (n,l,cls)=>`<div class="kpi ${cls||""}"><div class="n">${n}</div><div class="l">${l}</div></div>`;
+  const roomCard = R=>{
+    const eng = (R.room.dutyEngineers||"").trim();
+    const upRows = R.ups.map(({u,st})=>{
+      const m = [u.bv!=null?u.bv+" V":null, u.rt!=null?u.rt+" min":null, u.rtemp!=null?u.rtemp+" °C":null, u.lk!=null?u.lk+" kVA":null].filter(Boolean).join(" · ") || "no readings";
+      return `<button type="button" class="urow ${st}" data-room="${escH(R.key)}" aria-label="${escH(u.n||"Unassigned UPS")} ${SBADGE[st][1]}"><b>${escH(u.n||"(unassigned)")}</b>${sbadge(st)}<span class="m">${m}</span></button>`;
+    }).join("");
+    const stsChips = R.sts.map(({x,st})=>`<button type="button" class="schip ${st}" data-room="${escH(R.key)}" title="${SBADGE[st][1]}"><span aria-hidden="true">${SBADGE[st][0]}</span>${escH(x.n||"STS")}${x.temp!=null?" · "+x.temp+"°C":""}</button>`).join("");
+    let foot;
+    if(R.alarms>0){
+      foot = R.room.ackBy ? `<span>✓ Acknowledged by <b>${escH(R.room.ackBy)}</b></span><button type="button" class="btn ghost" data-room="${escH(R.key)}" data-focus="${escH(R.key)}.ackBy">Open sign-off</button>`
+                          : `<span>⚠ ${R.alarms} out of spec — not acknowledged</span><button type="button" class="btn warn" data-room="${escH(R.key)}" data-focus="${escH(R.key)}.ackBy">Acknowledge</button>`;
+    } else foot = `<span>${R.warns>0 ? R.warns+" advisory reading(s)" : "No out-of-spec readings"}</span><button type="button" class="btn ghost" data-room="${escH(R.key)}">Open log</button>`;
+    return `<section class="dcard"><div class="dcard-h"><h3>${escH(R.room.label)}</h3>${sbadge(R.worst)}
+      <div class="sub">${escH(R.room.location||"")}${R.room.date?" · log "+escH(R.room.date)+" "+escH(R.room.time||""):" · no log date"}${eng?" · "+escH(eng):""}</div></div>
+      <div class="dsec">UPS · ${R.ups.length}</div>${upRows||'<div class="dsec">none</div>'}
+      ${R.sts.length?`<div class="dsec">STS · ${R.sts.length}</div><div class="sts-chips">${stsChips}</div>`:""}
+      <div class="dcard-f">${foot}</div></section>`;
+  };
+  const battSt = F.units===0 ? "off" : (F.totalLeaked>0 ? "warn" : "ok");
+  const battCard = `<section class="dcard"><div class="dcard-h"><h3>Battery banks</h3>${sbadge(battSt, F.units===0?"NOT TRACKED":(F.totalLeaked>0?"LEAKS FOUND":"NORMAL"))}
+      <div class="sub">leak / bloat inspection · ${F.units} UPS unit(s)</div></div>
+      <div class="batt-card"><div class="ring">${ringSvg(F.healthPct,56)}</div>
+      <div class="t"><b>${F.healthPct}%</b> fleet health<br><b>${F.totalCells.toLocaleString()}</b> batteries tracked · <b>${F.totalLeaked}</b> leaked<br><b>${F.unitsWithLeak}</b> of ${F.units} unit(s) with leaks</div></div>
+      <div class="dcard-f"><span>Per-bank detail, remarks and reports</span><button type="button" class="btn ghost" data-go="battery">Open batteries</button></div></section>`;
+  host.innerHTML = `
+    <div class="dash-banner ${overall}"><h2>${msg}</h2>${sbadge(overall)}
+      <div class="meta">Monitoring: manual log · ${D.upsMon+D.stsMon}/${D.upsTotal+D.stsTotal} units have readings<br>${last?"Last log entry: "+escH(last.date)+" "+escH(last.time)+" ("+escH(last.loc||"")+")":"No log entry dated yet"}${saved?" · "+escH(saved):""}</div></div>
+    <div class="dash-kpis">
+      ${kpi(D.upsTotal,"UPS units"+(D.upsMon<D.upsTotal?` (${D.upsMon} read)`:""))}
+      ${kpi(D.stsTotal,"STS units"+(D.stsMon<D.stsTotal?` (${D.stsMon} read)`:""))}
+      ${kpi(D.alarms,"Out of spec",D.alarms>0?"crit":"ok")}
+      ${kpi(D.warns,"Advisories",D.warns>0?"warn":"ok")}
+      ${kpi(F.totalCells.toLocaleString(),"Batteries tracked")}
+      ${kpi(F.totalLeaked,"Leaked cells",F.totalLeaked>0?"warn":"ok")}
+    </div>
+    <div class="dash-actions">
+      <button type="button" class="btn primary" data-go="log">✏ Enter readings</button>
+      <button type="button" class="btn" data-go="trends">📈 Trends</button>
+      <button type="button" class="btn" data-go="battery">🔋 Batteries</button>
+      <button type="button" class="btn" data-go="assets">🗂 Unit details</button>
+      <button type="button" class="btn" data-go="guide">📖 Guide</button>
+      <button type="button" class="btn" data-go="export">🖨 Export report</button>
+    </div>
+    <div class="dash-grid">${D.rooms.map(roomCard).join("")}${battCard}</div>`;
+}
+document.getElementById("dashHost").addEventListener("click",(e)=>{
+  const g = e.target.closest("[data-go]");
+  if(g){ const a=g.getAttribute("data-go");
+    if(a==="trends") showTrendsModal(); else if(a==="export") document.getElementById("btnPrint").click(); else if(a==="assets") showAssetRegister(); else if(a==="guide") showHelpGuide(); else setView(a); return; }
+  const r = e.target.closest("[data-room]");
+  if(r) openRoomInLog(r.getAttribute("data-room"), r.getAttribute("data-focus"));
+});
+document.getElementById("bottomNav").addEventListener("click",(e)=>{
+  const b = e.target.closest("button[data-nav]"); if(!b) return;
+  const a = b.getAttribute("data-nav");
+  if(a==="reports") document.getElementById("btnPrint").click();
+  else if(a==="settings") document.getElementById("btnMoreTools").click();
+  else setView(a);
+});
+
+
+/* =========================================================
+   UNIT DETAILS / ASSET REGISTER (V11_14)
+   Stored under its own localStorage key (not inside STATE) so that
+   "Load sample data", presets and "Clear all readings" can never wipe it.
+   Keyed by unit ID (e.g. MUPS-1B), so it also lines up with the Batteries tab.
+   ========================================================= */
+const ASSETS_KEY = "ups_monitor_assets_v1";
+let ASSETS = (function(){ try{ const r = Store.get(ASSETS_KEY); const o = r && JSON.parse(r.value); return (o && typeof o==="object" && !Array.isArray(o)) ? o : {}; }catch(e){ return {}; } })();
+const ASSET_FIELDS = ["brand","model","sn","ip","installed","warranty","manual","site","notes"];
+function assetKey(n){ return String(n||"").trim().toUpperCase(); }
+function saveAssets(){ return !!Store.set(ASSETS_KEY, JSON.stringify(ASSETS)); }
+function getAsset(n){ return ASSETS[assetKey(n)] || null; }
+function hasAsset(n){ const a = getAsset(n); return !!(a && ASSET_FIELDS.some(f=>a[f])); }
+function normUrl(v){ v=(v||"").trim(); if(!v) return ""; return /^[a-z][a-z0-9+.-]*:/i.test(v) ? v : "https://"+v; }
+function validUrl(v){ return /^https?:\/\/[^\s<>"']+$/i.test(v); }          // only http(s) links are ever stored/opened
+function validHost(v){
+  const m = v.trim().match(/^(?:https?:\/\/)?([^\/:\s]+)(?::(\d{1,5}))?(?:\/\S*)?$/i); if(!m) return false;
+  if(m[2] && +m[2]>65535) return false;
+  const h = m[1]; if(/^\d+(\.\d+){3}$/.test(h)) return h.split(".").every(x=>+x<=255);
+  return /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*$/i.test(h);
+}
+function gatewayHref(ip){ ip=(ip||"").trim(); return ip ? (/^https?:\/\//i.test(ip) ? ip : "http://"+ip) : ""; }
+function ageText(d){
+  if(!d) return ""; const t = new Date(d+"T00:00:00"); if(isNaN(t)) return ""; const n = new Date();
+  let m = (n.getFullYear()-t.getFullYear())*12 + n.getMonth()-t.getMonth(); if(n.getDate()<t.getDate()) m--;
+  if(m<0) return "future date"; const y = Math.floor(m/12), r = m%12; return m<1 ? "< 1 month" : ((y?y+" y ":"")+(r?r+" m":"")).trim();
+}
+function warrantyState(d){ if(!d) return ""; const t = new Date(d+"T23:59:59"); if(isNaN(t)) return ""; return t < new Date() ? "expired" : "valid"; }
+function allUnits(){
+  const out = [], seen = new Set();
+  ROOM_ORDER.forEach(k=>{ const r = STATE[k]; if(!r) return;
+    [["ups","UPS"],["sts","STS"]].forEach(([sec,type])=>(r[sec]||[]).forEach(u=>{ if(u.n){ out.push({name:u.n,type,room:r.label,roomKey:k,section:sec}); seen.add(assetKey(u.n)); } })); });
+  Object.keys(ASSETS).forEach(k=>{ if(!seen.has(k) && hasAsset(k)) out.push({name:k,type:"—",room:"not in any room",roomKey:null,section:null}); });
+  return out;
+}
+function findUnitRoom(name){ const key = assetKey(name); return allUnits().find(x=>assetKey(x.name)===key && x.roomKey) || null; }
+function openAssetFromLog(rk, sec, i){ const u = STATE[rk] && STATE[rk][sec] && STATE[rk][sec][i]; openAssetEditor(u ? u.n : "", rk, sec); }
+function refreshAssetBadges(){
+  document.querySelectorAll(".assetbtn").forEach(b=>{ const r = STATE[b.getAttribute("data-rk")], u = r && r[b.getAttribute("data-sec")][+b.getAttribute("data-i")]; b.classList.toggle("has", !!(u && hasAsset(u.n))); });
+  const ds = document.getElementById("detailAsset"); if(ds && typeof BATTERY_ACTIVE!=="undefined" && BATTERY_ACTIVE) ds.innerHTML = assetSummaryHtml(BATTERY_ACTIVE);
+}
+document.addEventListener("change",(e)=>{ const p = e.target && e.target.getAttribute && e.target.getAttribute("data-path"); if(p && /\.n$/.test(p)) refreshAssetBadges(); });
+document.addEventListener("assets-changed",()=>{ refreshAssetBadges(); if(typeof drawAssetList==="function") drawAssetList(); if(VIEW==="dashboard") renderDashboard(); });
+
+function assetSummaryHtml(name){
+  const a = getAsset(name); if(!a || !ASSET_FIELDS.some(f=>a[f])) return "";
+  const bits = [];
+  const bm = [a.brand,a.model].filter(Boolean).join(" "); if(bm) bits.push(escH(bm));
+  if(a.sn) bits.push("SN "+escH(a.sn));
+  if(a.ip) bits.push("IP "+escH(a.ip));
+  if(a.installed) bits.push("installed "+escH(a.installed)+(ageText(a.installed)?" ("+ageText(a.installed)+")":""));
+  const links = [];
+  if(a.ip && validHost(a.ip)) links.push(`<a href="${escH(gatewayHref(a.ip))}" target="_blank" rel="noopener noreferrer">🌐 Gateway</a>`);
+  if(a.manual && validUrl(a.manual)) links.push(`<a href="${escH(a.manual)}" target="_blank" rel="noopener noreferrer">📘 Manual</a>`);
+  if(a.site && validUrl(a.site)) links.push(`<a href="${escH(a.site)}" target="_blank" rel="noopener noreferrer">🏭 Website</a>`);
+  return bits.join(" · ") + (links.length ? "<br>"+links.join("") : "");
+}
+
+function openAssetEditor(unitName, roomKey, section){
+  const key = assetKey(unitName);
+  if(!key){ showInfoModal("Name the unit first","Type the unit ID (e.g. MUPS-1B) in the Equipment column, then open its details again."); return; }
+  if(!roomKey){ const f = findUnitRoom(unitName); if(f){ roomKey=f.roomKey; section=f.section; } }
+  const a = Object.assign({brand:"",model:"",sn:"",ip:"",installed:"",warranty:"",manual:"",site:"",notes:""}, getAsset(unitName)||{});
+  const fld = (id,label,type,ph,val,extra,cls)=>`<div class="field-group ${cls||""}"><label for="as_${id}">${label}</label><input class="cell-input" style="width:100%;text-align:left" id="as_${id}" type="${type}" placeholder="${ph}" value="${escH(val)}" ${extra||""}></div>`;
+  const body = `<div class="asset-form">
+      ${fld("brand","Brand","text","e.g. Eaton",a.brand,'list="as_brands" autocomplete="off"')}
+      ${fld("model","Model","text","e.g. 93PR 300kVA",a.model,'autocomplete="off"')}
+      ${fld("sn","Serial number","text","S/N",a.sn,'autocapitalize="characters" autocomplete="off"')}
+      ${fld("ip","Gateway / network card IP","text","e.g. 192.168.1.50",a.ip,'inputmode="url" autocomplete="off"')}
+      ${fld("installed","Installed date","date","",a.installed)}
+      ${fld("warranty","Warranty until","date","",a.warranty)}
+      ${fld("manual","Manual link","url","https://…",a.manual,'inputmode="url" autocomplete="off"',"full")}
+      ${fld("site","Brand / support website","url","https://…",a.site,'inputmode="url" autocomplete="off"',"full")}
+      <div class="field-group full"><label for="as_notes">Notes / site procedure reference</label><textarea class="cell-input" id="as_notes" placeholder="e.g. where the manual is kept, who services this unit, site procedure no.">${escH(a.notes)}</textarea></div>
+    </div>
+    <datalist id="as_brands"><option value="Eaton"><option value="APC"><option value="Vertiv"><option value="Schneider Electric"><option value="Delta"><option value="Socomec"><option value="Riello"><option value="ABB"></datalist>
+    <div class="asset-links no-print">
+      <button type="button" class="btn ghost" data-open="ip">🌐 Open gateway</button>
+      <button type="button" class="btn ghost" data-open="manual">📘 Open manual</button>
+      <button type="button" class="btn ghost" data-open="site">🏭 Open website</button>
+      ${roomKey && section ? `<button type="button" class="btn ghost" data-apply="1">⧉ Copy brand, model &amp; links to the other units in this room</button>` : ""}
+    </div>`;
+  const { backdrop, close } = showFormModal("Unit details — "+escH(unitName.trim()), "Everything here is optional. Stored on this device and included in full backups.", body, "Save details", (bd, closeFn)=>{
+    const v = id => bd.querySelector("#as_"+id).value.trim();
+    const rec = { brand:v("brand"), model:v("model"), sn:v("sn"), ip:v("ip"), installed:v("installed"), warranty:v("warranty"), manual:normUrl(v("manual")), site:normUrl(v("site")), notes:v("notes") };
+    const err = readErr(rec); if(err){ status(bd, err, true); return; }
+    if(ASSET_FIELDS.every(f=>!rec[f])) delete ASSETS[key]; else { rec.updated = new Date().toISOString(); ASSETS[key] = rec; }
+    if(!saveAssets()){ status(bd, "Couldn't save — browser storage is full or blocked.", true); return; }
+    try{ logAudit(roomKey||null, `Updated unit details for ${unitName.trim()}.`); }catch(e){}
+    closeFn(); document.dispatchEvent(new Event("assets-changed")); showToast("✓ Unit details saved", 1500);
+  });
+  backdrop.querySelector(".modal-card").classList.add("wide");
+  function readErr(rec){
+    if(rec.ip && !validHost(rec.ip)) return "The gateway IP doesn't look right — use an IPv4 address like 192.168.1.50 (a port or hostname is fine too).";
+    if(rec.manual && !validUrl(rec.manual)) return "The manual link must be a web address (http:// or https://).";
+    if(rec.site && !validUrl(rec.site)) return "The website link must be a web address (http:// or https://).";
+    return "";
+  }
+  function status(bd, msg, bad){ const el = bd.querySelector(".modal-form-status"); el.style.display = ""; el.textContent = msg; el.style.color = bad ? "var(--red)" : "var(--green)"; }
+  backdrop.addEventListener("click",(e)=>{
+    const o = e.target.closest("[data-open]");
+    if(o){ const w = o.getAttribute("data-open"), val = backdrop.querySelector("#as_"+w).value.trim();
+      const url = w==="ip" ? (val && validHost(val) ? gatewayHref(val) : "") : normUrl(val);
+      if(!url || (w!=="ip" && !validUrl(url))){ status(backdrop,"Enter a valid "+(w==="ip"?"IP address":"link")+" first.",true); return; }
+      window.open(url,"_blank","noopener,noreferrer"); return; }
+    if(e.target.closest("[data-apply]")){
+      const cur = {brand:backdrop.querySelector("#as_brand").value.trim(), model:backdrop.querySelector("#as_model").value.trim(), manual:normUrl(backdrop.querySelector("#as_manual").value), site:normUrl(backdrop.querySelector("#as_site").value)};
+      if((cur.manual && !validUrl(cur.manual)) || (cur.site && !validUrl(cur.site))){ status(backdrop,"Fix the link first (must start with http:// or https://).",true); return; }
+      let n = 0;
+      (STATE[roomKey][section]||[]).forEach(u=>{ const k = assetKey(u.n); if(!k || k===key) return; const t = ASSETS[k] || (ASSETS[k] = {});
+        let changed = false; ["brand","model","manual","site"].forEach(f=>{ if(!t[f] && cur[f]){ t[f] = cur[f]; changed = true; } }); if(changed) n++; });
+      saveAssets(); document.dispatchEvent(new Event("assets-changed"));
+      status(backdrop, n ? `Copied to ${n} other unit(s) — only their empty fields were filled.` : "Nothing to copy — the other units already have those fields.", false);
+    }
+  });
+}
+window.openAssetEditor = openAssetEditor; window.openAssetFromLog = openAssetFromLog;
+
+/* ---- register: every UPS/STS with its details, searchable, CSV export ---- */
+let drawAssetList = null;
+function showAssetRegister(){
+  const { backdrop, close } = showFormModal("UPS & STS unit details", "Tap a unit to add or edit its serial number, gateway IP, install date and links.",
+    `<input type="search" class="cell-input asset-search" id="assetSearch" placeholder="Search unit, serial no., IP, brand…" aria-label="Search units"><div class="sub" id="assetCount" style="margin:0 0 6px;color:var(--text-dim);font:11px var(--font-mono)"></div><div id="assetList"></div>`,
+    "⬇ Export CSV", ()=>{ exportAssetsCsv(); });
+  backdrop.querySelector(".modal-card").classList.add("wide");
+  const list = backdrop.querySelector("#assetList"), input = backdrop.querySelector("#assetSearch");
+  drawAssetList = function(){
+    if(!document.body.contains(backdrop)){ drawAssetList = null; return; }
+    const q = input.value.trim().toLowerCase(), units = allUnits();
+    const done = units.filter(u=>hasAsset(u.name)).length;
+    backdrop.querySelector("#assetCount").textContent = `${done} of ${units.length} units have details`;
+    const rows = units.filter(u=>{ const a = getAsset(u.name)||{}; return !q || [u.name,u.room,u.type,a.brand,a.model,a.sn,a.ip].join(" ").toLowerCase().includes(q); }).map((u,idx)=>{
+      const a = getAsset(u.name)||{}, bm = [a.brand,a.model].filter(Boolean).join(" ");
+      const w = warrantyState(a.warranty);
+      const l1 = [bm, a.sn?"SN "+a.sn:""].filter(Boolean).join(" · ") || "no details yet — tap to add";
+      const l2 = [a.ip?"IP "+a.ip:"", a.installed?"installed "+a.installed+(ageText(a.installed)?" ("+ageText(a.installed)+")":""):""].filter(Boolean).join(" · ");
+      const links = [ a.ip&&validHost(a.ip) ? `<a href="${escH(gatewayHref(a.ip))}" target="_blank" rel="noopener noreferrer" title="Open gateway" aria-label="Open gateway for ${escH(u.name)}">🌐</a>` : "",
+                      a.manual&&validUrl(a.manual) ? `<a href="${escH(a.manual)}" target="_blank" rel="noopener noreferrer" title="Open manual" aria-label="Open manual for ${escH(u.name)}">📘</a>` : "",
+                      a.site&&validUrl(a.site) ? `<a href="${escH(a.site)}" target="_blank" rel="noopener noreferrer" title="Open website" aria-label="Open website for ${escH(u.name)}">🏭</a>` : "" ].join("");
+      return `<div class="arow"><button type="button" class="arow-main" data-idx="${units.indexOf(u)}"><b>${escH(u.name)} <span style="font:11px var(--font-mono);color:var(--text-dim)">${escH(u.type)} · ${escH(u.room)}</span></b><span class="adesc">${escH(l1)}</span>${l2?`<span class="adesc">${escH(l2)}</span>`:""}${w==="expired"?`<span class="adesc awarn">▲ warranty expired ${escH(a.warranty)}</span>`:(w==="valid"?`<span class="adesc">warranty until ${escH(a.warranty)}</span>`:"")}</button><span class="alinks">${links}</span></div>`;
+    }).join("");
+    list.innerHTML = rows || '<div class="sub" style="padding:10px;color:var(--text-dim)">No units match.</div>';
+    list._units = units;
+  };
+  input.addEventListener("input", ()=>drawAssetList());
+  list.addEventListener("click",(e)=>{ const b = e.target.closest(".arow-main"); if(!b) return; const u = list._units[+b.getAttribute("data-idx")]; if(u) openAssetEditor(u.name, u.roomKey, u.section); });
+  drawAssetList();
+}
+function exportAssetsCsv(){
+  const rows = [["Room","Type","Unit","Brand","Model","Serial number","Gateway IP","Installed","Age","Warranty until","Manual link","Brand website","Notes"]];
+  allUnits().forEach(u=>{ const a = getAsset(u.name)||{}; rows.push([u.room,u.type,u.name,a.brand,a.model,a.sn,a.ip,a.installed,ageText(a.installed),a.warranty,a.manual,a.site,a.notes]); });
+  downloadTextFile("MUPS-Watch-unit-details-"+new Date().toISOString().slice(0,10)+".csv", "\ufeff"+rows.map(r=>r.map(csvEscape).join(",")).join("\r\n"), "text/csv");
+  try{ logAudit(null,"Exported unit details as CSV."); }catch(e){}
+}
+window.showAssetRegister = showAssetRegister;
+
+/* ---- in-app guide ---- */
+function showHelpGuide(){
+  const D = DEFAULT_SPEC;
+  const seen = new Set(), links = [];
+  allUnits().forEach(u=>{ const a = getAsset(u.name)||{};
+    [["📘 Manual",a.manual],["🏭 Website",a.site]].forEach(([lab,url])=>{ if(url && validUrl(url) && !seen.has(lab+url)){ seen.add(lab+url); links.push(`<li>${lab} — <a href="${escH(url)}" target="_blank" rel="noopener noreferrer">${escH(url.replace(/^https?:\/\//,"").slice(0,60))}</a> <span>(${escH(u.name)})</span></li>`); } }); });
+  const sec = (title, html, open)=>`<details ${open?"open":""}><summary>${title}</summary><div class="hb">${html}</div></details>`;
+  const body = `<div class="help">
+   ${sec("🚀 Quick start",`<ul><li><b>Dashboard</b> shows overall health, each room, and the battery fleet.</li><li><b>Logs</b> → pick the room tab → type the readings. Red = out of spec, amber = advisory.</li><li>Add <b>Remarks</b> and the <b>Acknowledged By</b> sign-off at the bottom of the room.</li><li><b>Reports</b> (or Export / Print PDF) makes the PDF or Excel sheet.</li></ul>`,true)}
+   ${sec("⌨ Entering readings",`<ul><li><b>Typing:</b> tap a field and type. Values save automatically on this device.</li><li><b>📷 Camera scan:</b> tick the 📷 box in a reading group's header, tap a field in that row, press the camera button, frame the digits and capture, then check the numbers before confirming.</li><li><b>🤖 AI vision (optional):</b> More → OCR settings. It needs internet and your own API key; offline OCR is the default.</li><li><b>🎤 Voice:</b> tap a reading field first, then the 🎤 button. Always check what was heard.</li><li><b>Automatic cells:</b> STS <b>Input Current</b> = Load % × 4 and UPS <b>Load kVA</b> = sum of its 5 Universal Power Module values, and UPS <b>Total kVA</b> = Load kVA of the two paralleled units (1st+2nd, 3rd+4th… in each room) — both read-only. In the inspection checks, <b>Ambient °C</b> copies the unit's Room °C / Temp reading; <b>Condition</b> is ABNORMAL if any reading is out of spec, CHARGING if UPS Charge A is above 0, otherwise NORMAL; <b>Display</b> is CHARGING if Charge A is above 0, ABNORMAL if a reading is out of spec, otherwise NORMAL. They follow the readings every time a reading changes. Dashed cells are automatic — type or choose a value to override, or clear it to go back to automatic.</li></ul>`)}
+   ${sec("🚦 Status colours & limits",`<ul><li>UPS input/output voltage: <b>${D.upsV.min}–${D.upsV.max} V</b> (±10% of 400 V)</li><li>STS source voltage: <b>${D.stsSrc.min}–${D.stsSrc.max} V</b> · Frequency: <b>${D.freq.min}–${D.freq.max} Hz</b></li><li>Battery charging current: max <b>${D.charge.max} A</b> · Room temperature: advisory at <b>${D.roomT.max} °C</b> or above</li><li>These are the defaults. Each room can have its own limits under <b>⚙ Thresholds</b>.</li><li>Dashboard badges: ✓ NORMAL · ▲ WARNING · ✕ CRITICAL · ○ NOT MONITORED (no readings entered).</li><li>The PDF/Excel export uses the limits of the monitoring sheet, which can differ slightly from the on-screen alarms.</li></ul>`)}
+   ${sec("🔋 Batteries",`<ul><li>Open a unit to see every battery. <b>Tap</b> a cell to mark it leaked, tap again to clear. <b>Press &amp; hold</b> to read or add a comment.</li><li>Use <b>⚙ Configure banks/cells</b> if the bank layout changes.</li><li>Export: <b>full report</b> (summary + every unit) or the quick <b>one-page summary</b>.</li></ul>`)}
+   ${sec("🗂 Unit details & links",`<ul><li>Tap the small <b>ℹ</b> next to a unit name in the log (or <b>ℹ UPS details</b> in Batteries, or the Dashboard's <b>Unit details</b>) to save serial number, gateway IP, install date, warranty, manual link, brand website and notes.</li><li><b>🌐 Open gateway</b> opens the network card page — you must be on the same network.</li><li>Links open in your browser and need internet (a gateway IP only needs the site network).</li><li>The register can be exported to CSV and is included in full backups.</li></ul>`)}
+   ${sec("🖨 Export, print & share",`<ul><li>Page/tab 1 = Room 4, page/tab 2 = Rooms 1, 2 &amp; 3, laid out like the monitoring sheet. Choose PDF, Excel or Share.</li><li>On phones, <b>print</b> saves the PDF first — open it from Downloads and print from the viewer.</li></ul>`)}
+   ${sec("💾 Backup & your data",`<ul><li>Data is stored <b>only on this device</b>. Clearing the browser's site data deletes it.</li><li>Use <b>More → Export full backup (.json)</b> regularly, and share the file to move data to another phone (<b>Import backup</b>).</li><li>Importing a backup replaces room data; unit details are merged in.</li></ul>`)}
+   ${sec("📶 Offline & installing",`<ul><li>After the first load the app works without internet. Online-only: the PDF engine on first use, AI OCR, and the links.</li><li>The camera works only when the page is opened over <b>https</b> (or localhost), not from a plain file.</li></ul>`)}
+   ${sec("⚠ Safety",`<p>This app records readings and notes only. For any bypass, shutdown or battery work, follow the manufacturer's manual and your site's procedures.</p>`)}
+   ${links.length ? sec("🔗 Saved manuals & websites",`<ul>${links.join("")}</ul>`) : ""}
+  </div>`;
+  const { backdrop } = showFormModal("Help & user guide", "", body, "Got it", (bd, closeFn)=> closeFn());
+  backdrop.querySelector(".modal-card").classList.add("wide");
+}
+window.showHelpGuide = showHelpGuide;
+
+
+/* =========================================================
+   AUTOMATIC VALUES (V11_15)
+   1) STS Input Current = Load % × 4 per phase. Those cells are read-only.
+   2) UPS/STS inspection checks follow the readings (both check times):
+        Ambient °C  = UPS "Room °C" / STS "Temp"
+        Condition   = ABNORMAL if any reading is out of spec, else CHARGING if UPS Charge A > 0, else NORMAL
+        Display     = CHARGING if UPS Charge A > 0, else ABNORMAL if any reading is out of spec, else NORMAL
+      The readings are authoritative: every cell is recalculated whenever a reading changes and
+      when data is loaded/imported, including values saved by older versions. Only a value the
+      engineer types/chooses by hand on that check (flags mt/mc/md) or a deliberate ABNORMAL/OFF
+      saved before auto-fill existed is left alone. Clear the cell to hand it back to automatic.
+      A unit with no readings at all is not touched.
+   "Out of spec" = the same red alarms the log shows (each room's own thresholds).
+   ========================================================= */
+function calcNum(path, val, tip){
+  const v = (val===null||val===undefined) ? "" : val;
+  return `<input class="cell-input narrow calc" type="number" step="0.1" readonly tabindex="-1" aria-readonly="true"
+            data-path="${path}" data-kind="num" value="${v}" placeholder="—" title="${tip||"Calculated: Load % × 4 (not editable)"}">`;
+}
+const round1 = x => Math.round(x*10)/10;
+/* Input current from load %. clearWhenEmpty: a live edit that empties a Load % also empties its current;
+   the load-time pass never erases an existing stored value. */
+function deriveIc(s, clearWhenEmpty){
+  let changed = false;
+  for(let k=0;k<3;k++){
+    const lp = s.lp[k];
+    const nv = (lp===null||lp===undefined||lp===""||isNaN(lp)) ? (clearWhenEmpty ? null : s.ic[k]) : round1(parseFloat(lp)*4);
+    if(s.ic[k]!==nv){ s.ic[k]=nv; changed=true; }
+  }
+  return changed;
+}
+/* Load kVA = sum of the unit's 5 Universal Power Module values (V11_19). Runs before the pair
+   total, which is built from Load kVA. Live edits that empty every module also empty the load;
+   the load-time pass never erases a stored value when the modules are blank. */
+function deriveLk(u, clearWhenEmpty){
+  const vals = (u.upm||[]).filter(x=>x!==null && x!==undefined && x!=="" && !isNaN(x)).map(parseFloat);
+  const nv = vals.length ? round1(vals.reduce((a,b)=>a+b,0)) : (clearWhenEmpty ? null : u.lk);
+  if(u.lk!==nv){ const had = (u.lk!==null && u.lk!==undefined); u.lk = nv; return had ? 1 : 0.5; }   // 1 = an existing value changed, 0.5 = newly filled
+  return 0;
+}
+/* Total kVA of a paralleled pair = Load kVA of unit 1 + Load kVA of unit 2. Pairs are
+   consecutive rows in each room (1st+2nd, 3rd+4th, …), matching the merged "Total Load KVA"
+   cell of the monitoring sheet; the total lives on the first unit of the pair. An odd
+   last unit has no partner, so its total is just its own Load kVA. */
+function deriveTl(room, clearWhenEmpty){
+  let changed = 0;
+  const ups = room.ups||[];
+  for(let p=0;p<ups.length;p+=2){
+    const vals = [ups[p].lk, ups[p+1] && ups[p+1].lk].filter(x=>x!==null && x!==undefined && x!=="" && !isNaN(x)).map(parseFloat);
+    const nv = vals.length ? round1(vals.reduce((a,b)=>a+b,0)) : (clearWhenEmpty ? null : ups[p].tl);
+    if(ups[p].tl!==nv){ if(ups[p].tl!==null && ups[p].tl!==undefined) changed++; ups[p].tl = nv; ups.__changed = true; }
+  }
+  return changed;
+}
+function unitReadings(sec, u){
+  return sec==="ups" ? [].concat(u.iv,u.ov,[u.lk,u.tl],u.upm,[u.bv,u.rt,u.cc,u.rtemp])
+                     : [].concat(u.s1,u.s2,u.lp,u.ic,[u.temp],u.fq);
+}
+function unitHasData(sec, u){ return unitReadings(sec,u).some(v=>v!==null && v!==undefined && v!==""); }
+function unitHasAlarm(roomKey, sec, u){
+  const eff = getEffectiveSpec(roomKey), bad = (spec,v)=> alarmClass(spec,v,eff)==="alarm";
+  if(sec==="ups") return u.iv.some(v=>bad("upsV",v)) || u.ov.some(v=>bad("upsV",v)) || bad("charge",u.cc);
+  return u.s1.some(v=>bad("stsSrc",v)) || u.s2.some(v=>bad("stsSrc",v)) || u.fq.some(v=>bad("freq",v));
+}
+let AUTO_OVERWRITTEN = 0;
+/* is this cell the engineer's own entry? (explicit flag, or a deliberate ABNORMAL/OFF that the app did not write) */
+function isManualCell(ins, f){
+  const mk = f==="temp" ? "mt" : f==="cond" ? "mc" : "md";
+  if(ins[mk]) return true;
+  if(f!=="temp"){ const v = ins[f], ak = f==="cond" ? "ac" : "ad"; if((v==="ABNORMAL"||v==="OFF") && !ins[ak]) return true; }
+  return false;
+}
+function isAuto(sec, u, j, f){
+  const ins = u.insp && u.insp[j]; if(!ins || !unitHasData(sec,u) || isManualCell(ins,f)) return false;
+  const v = ins[f]; return v!==null && v!==undefined && v!=="";
+}
+function autoInspect(roomKey, sec, u){
+  if(!unitHasData(sec,u)) return false;                          // nothing measured yet -> leave the checks exactly as they are
+  const issue = unitHasAlarm(roomKey,sec,u);
+  const src = sec==="ups" ? u.rtemp : u.temp;
+  const charging = sec==="ups" && u.cc!==null && u.cc!==undefined && u.cc!=="" && parseFloat(u.cc)>0;
+  const setv = (ins,f,nv)=>{ if(ins[f]!==nv){ if(ins[f]!==null && ins[f]!==undefined && ins[f]!=="") AUTO_OVERWRITTEN++; ins[f]=nv; return true; } return false; };
+  let changed = false;
+  (u.insp||[]).forEach(ins=>{
+    if(src!==null && src!==undefined && src!=="" && !isManualCell(ins,"temp")) changed = setv(ins,"temp",src) || changed;
+    if(!isManualCell(ins,"cond")){ changed = setv(ins,"cond", issue ? "ABNORMAL" : (charging ? "CHARGING" : "NORMAL")) || changed; ins.ac = true; }
+    if(!isManualCell(ins,"disp")){ changed = setv(ins,"disp", charging ? "CHARGING" : (issue ? "ABNORMAL" : "NORMAL")) || changed; ins.ad = true; }
+  });
+  return changed;
+}
+function autoSyncAll(){
+  let changed = false, recalced = 0, tlRecalced = 0, lkRecalced = 0; AUTO_OVERWRITTEN = 0;
+  (typeof ROOM_ORDER!=="undefined" ? ROOM_ORDER : []).forEach(k=>{
+    const room = STATE && STATE[k]; if(!room) return;
+    (room.sts||[]).forEach(s=>{
+      const before = s.ic.slice();
+      if(deriveIc(s,false)){ changed=true; s.ic.forEach((v,x)=>{ if(before[x]!==null && before[x]!==undefined && before[x]!==v) recalced++; }); }
+      if(autoInspect(k,"sts",s)) changed=true; });
+    if(room.ups){ room.ups.forEach(u=>{ const r = deriveLk(u,false); if(r){ changed = true; if(r===1) lkRecalced++; } });
+      room.ups.__changed = false; tlRecalced += deriveTl(room,false); if(room.ups.__changed) changed = true; delete room.ups.__changed; }
+    (room.ups||[]).forEach(u=>{ if(autoInspect(k,"ups",u)) changed=true; });
+  });
+  if(AUTO_OVERWRITTEN>0){ try{ logAudit(null, `Inspection checks updated from the readings (ambient °C / condition / display): ${AUTO_OVERWRITTEN} stored value(s) changed.`); }catch(e){} }
+  if(lkRecalced>0){ try{ logAudit(null, `Load kVA recalculated as the sum of the 5 Universal Power Module values for ${lkRecalced} stored value(s).`); }catch(e){} }
+  if(tlRecalced>0){ try{ logAudit(null, `Total kVA recalculated as the sum of paired Load kVA for ${tlRecalced} stored value(s).`); }catch(e){} }
+  if(recalced>0){ try{ logAudit(null, `Input current recalculated as Load % × 4 for ${recalced} stored STS value(s).`); }catch(e){} }
+  return changed;
+}
+/* paint one unit's derived cells into the live DOM (no re-render, so focus is kept) */
+function setSelectUi(el, v){
+  el.value = v||""; el.className = el.className.replace(/st-\w+/g,"").trim();
+  const c = v==="NORMAL"?"st-normal":v==="ABNORMAL"?"st-abnormal":v==="CHARGING"?"st-charging":v==="OFF"?"st-off":""; if(c) el.classList.add(c);
+}
+function paintUnitAuto(roomKey, sec, i){
+  const u = STATE[roomKey][sec][i], q = p=>document.querySelector(`[data-path="${roomKey}.${sec}.${i}.${p}"]`);
+  if(sec==="sts") for(let k=0;k<3;k++){ const el=q("ic."+k); if(el) el.value = (u.ic[k]===null||u.ic[k]===undefined) ? "" : u.ic[k]; }
+  [0,1].forEach(j=>{
+    const ins = u.insp[j], t=q(`insp.${j}.temp`), c=q(`insp.${j}.cond`), d=q(`insp.${j}.disp`);
+    if(t){ t.value = (ins.temp===null||ins.temp===undefined) ? "" : ins.temp; t.classList.toggle("autofill", isAuto(sec,u,j,"temp")); }
+    if(c){ setSelectUi(c, ins.cond); c.classList.toggle("autofill", isAuto(sec,u,j,"cond")); }
+    if(d){ setSelectUi(d, ins.disp); d.classList.toggle("autofill", isAuto(sec,u,j,"disp")); }
+  });
+}
+function autoOnInput(parts, val, el){
+  const roomKey = parts[0], sec = parts[1], i = parts[2], room = STATE[roomKey];
+  if(!room || (sec!=="ups" && sec!=="sts") || typeof i!=="number" || !room[sec][i]) return;
+  const u = room[sec][i], f = parts[3];
+  if(f==="insp"){                                         // the engineer edited a check by hand
+    const ins = u.insp[parts[4]], what = parts[5];
+    const mk = what==="temp" ? "mt" : what==="cond" ? "mc" : "md", ak = what==="cond" ? "ac" : (what==="disp" ? "ad" : null);
+    if(val===null || val===""){ ins[mk]=false; if(ak) ins[ak]=false; autoInspect(roomKey,sec,u); paintUnitAuto(roomKey,sec,i); }   // emptied -> back to automatic
+    else { ins[mk]=true; if(ak) ins[ak]=false; if(el) el.classList.remove("autofill"); }                                      // own value -> protected
+    return;
+  }
+  if(f==="n" || f==="c" || f==="time") return;
+  if(sec==="ups" && (f==="upm" || f==="lk" || f==="tl")){    // modules -> Load kVA -> pair Total kVA (typed/scanned values in the calculated cells are overridden)
+    deriveLk(u,true);
+    const lEl = document.querySelector(`[data-path="${roomKey}.ups.${i}.lk"]`);
+    if(lEl) lEl.value = (u.lk===null||u.lk===undefined) ? "" : u.lk;
+    deriveTl(room,true); delete room.ups.__changed;
+    const first = i - (i%2), tEl = document.querySelector(`[data-path="${roomKey}.ups.${first}.tl"]`);
+    if(tEl) tEl.value = (room.ups[first].tl===null||room.ups[first].tl===undefined) ? "" : room.ups[first].tl;
+  }
+  if(sec==="sts" && (f==="lp" || f==="ic")) deriveIc(u,true);   // typed/scanned/voice values in Input Current are overridden by Load % × 4
+  autoInspect(roomKey,sec,u);
+  paintUnitAuto(roomKey,sec,i);
+}
 
 (async function init(){
   applyTheme();
@@ -5084,7 +5674,8 @@ document.getElementById("btnMoreTools").addEventListener("click", ()=>{
   initVoiceEntry();
   updateCameraFabState();
   initReticleInteraction();
-  setView("log");
+  refreshStatusDot();
+  setView("dashboard");      // open on the health overview
 })();
 
 })();
