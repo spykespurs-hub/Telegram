@@ -6,7 +6,6 @@
 // Set the theme before first paint, straight from localStorage, so the
 // page never flashes the default dark theme before switching to a
 // saved light/system preference.
-  //valiente nuyda APSI 3039
 (function(){
   try{
     var t = window.localStorage.getItem("ups_monitor_theme_v1") || "dark";
@@ -2092,7 +2091,7 @@ function renderUpsTable(roomKey, room){
       <td>${num(base+'.ov.0',u.ov[0],{spec:'upsV',effSpec:effSpec})}</td>
       <td>${num(base+'.ov.1',u.ov[1],{spec:'upsV',effSpec:effSpec})}</td>
       <td>${num(base+'.ov.2',u.ov[2],{spec:'upsV',effSpec:effSpec})}</td>
-      <td>${calcNum(base+'.lk',u.lk,'Calculated: sum of this UPS\'s 5 Universal Power Module values. Not editable.')}</td>
+      <td>${calcNum(base+'.lk',u.lk,'Calculated: sum of the 5 Universal Power Module values (not editable)')}</td>
       ${i%2===0 ? `<td class="pairtot" rowspan="${i+1<room.ups.length?2:1}">${calcNum(base+'.tl',u.tl,'Calculated: Load kVA of '+(u.n||'this UPS')+(room.ups[i+1]?' + '+(room.ups[i+1].n||'its pair'):'')+' (paralleled pair). Not editable.')}</td>` : ''}
       <td>${num(base+'.upm.0',u.upm[0],{narrow:true})}</td>
       <td>${num(base+'.upm.1',u.upm[1],{narrow:true})}</td>
@@ -4968,7 +4967,7 @@ function tplLayout(m){
     C(r,1,TB.ups+"    "+u.n,{b:1,sz:6,al:"c"}); C(r,2,u.c,LB);
     u.iv.forEach((v,k)=>C(r,3+k,v,fl(N,out(v,380,420))));
     u.ov.forEach((v,k)=>C(r,6+k,v,fl(N,out(v,380,420))));
-    C(r,9,u.lk,fl(N,out(u.lk,null,300)),1,1,(u.lk!=null && u.upm.some(x=>x!=null)) ? `SUM(K${r}:O${r})` : null);
+    C(r,9,u.lk,fl(N,out(u.lk,null,300)),1,1,u.upm.some(x=>x!=null) ? `SUM(K${r}:O${r})` : null);
     u.upm.forEach((v,k)=>C(r,11+k,v,fl(N,out(v,null,60))));
     C(r,16,u.bv,fl(N,out(u.bv,505,555))); C(r,17,u.rt,N);
     C(r,18,u.cc,fl(N,out(u.cc,null,5))); C(r,19,u.rtemp,fl(N,out(u.rtemp,null,22)));
@@ -5500,7 +5499,7 @@ function showHelpGuide(){
   const sec = (title, html, open)=>`<details ${open?"open":""}><summary>${title}</summary><div class="hb">${html}</div></details>`;
   const body = `<div class="help">
    ${sec("🚀 Quick start",`<ul><li><b>Dashboard</b> shows overall health, each room, and the battery fleet.</li><li><b>Logs</b> → pick the room tab → type the readings. Red = out of spec, amber = advisory.</li><li>Add <b>Remarks</b> and the <b>Acknowledged By</b> sign-off at the bottom of the room.</li><li><b>Reports</b> (or Export / Print PDF) makes the PDF or Excel sheet.</li></ul>`,true)}
-   ${sec("⌨ Entering readings",`<ul><li><b>Typing:</b> tap a field and type. Values save automatically on this device.</li><li><b>📷 Camera scan:</b> tick the 📷 box in a reading group's header, tap a field in that row, press the camera button, frame the digits and capture, then check the numbers before confirming.</li><li><b>🤖 AI vision (optional):</b> More → OCR settings. It needs internet and your own API key; offline OCR is the default.</li><li><b>🎤 Voice:</b> tap a reading field first, then the 🎤 button. Always check what was heard.</li><li><b>Automatic cells:</b> STS <b>Input Current</b> = Load % × 4 and UPS <b>Load kVA</b> = sum of its 5 Universal Power Module values, and UPS <b>Total kVA</b> = Load kVA of the two paralleled units (1st+2nd, 3rd+4th… in each room) — both read-only. In the inspection checks, <b>Ambient °C</b> copies the unit's Room °C / Temp reading; <b>Condition</b> is ABNORMAL if any reading is out of spec, CHARGING if UPS Charge A is above 0, otherwise NORMAL; <b>Display</b> is CHARGING if Charge A is above 0, ABNORMAL if a reading is out of spec, otherwise NORMAL. They follow the readings every time a reading changes. Dashed cells are automatic — type or choose a value to override, or clear it to go back to automatic.</li></ul>`)}
+   ${sec("⌨ Entering readings",`<ul><li><b>Typing:</b> tap a field and type. Values save automatically on this device.</li><li><b>📷 Camera scan:</b> tick the 📷 box in a reading group's header, tap a field in that row, press the camera button, frame the digits and capture, then check the numbers before confirming.</li><li><b>🤖 AI vision (optional):</b> More → OCR settings. It needs internet and your own API key; offline OCR is the default.</li><li><b>🎤 Voice:</b> tap a reading field first, then the 🎤 button. Always check what was heard.</li><li><b>Automatic cells:</b> STS <b>Input Current</b> = Load % × 4 and UPS <b>Load kVA</b> = the sum of the 5 Universal Power Module values, and <b>Total kVA</b> = Load kVA of the two paralleled units (1st+2nd, 3rd+4th… in each room) — all read-only. In the inspection checks, <b>Ambient °C</b> copies the unit's Room °C / Temp reading; <b>Condition</b> is ABNORMAL if any reading is out of spec, CHARGING if UPS Charge A is above 0, otherwise NORMAL; <b>Display</b> is CHARGING if Charge A is above 0, ABNORMAL if a reading is out of spec, otherwise NORMAL. They follow the readings every time a reading changes. Dashed cells are automatic — type or choose a value to override, or clear it to go back to automatic.</li></ul>`)}
    ${sec("🚦 Status colours & limits",`<ul><li>UPS input/output voltage: <b>${D.upsV.min}–${D.upsV.max} V</b> (±10% of 400 V)</li><li>STS source voltage: <b>${D.stsSrc.min}–${D.stsSrc.max} V</b> · Frequency: <b>${D.freq.min}–${D.freq.max} Hz</b></li><li>Battery charging current: max <b>${D.charge.max} A</b> · Room temperature: advisory at <b>${D.roomT.max} °C</b> or above</li><li>These are the defaults. Each room can have its own limits under <b>⚙ Thresholds</b>.</li><li>Dashboard badges: ✓ NORMAL · ▲ WARNING · ✕ CRITICAL · ○ NOT MONITORED (no readings entered).</li><li>The PDF/Excel export uses the limits of the monitoring sheet, which can differ slightly from the on-screen alarms.</li></ul>`)}
    ${sec("🔋 Batteries",`<ul><li>Open a unit to see every battery. <b>Tap</b> a cell to mark it leaked, tap again to clear. <b>Press &amp; hold</b> to read or add a comment.</li><li>Use <b>⚙ Configure banks/cells</b> if the bank layout changes.</li><li>Export: <b>full report</b> (summary + every unit) or the quick <b>one-page summary</b>.</li></ul>`)}
    ${sec("🗂 Unit details & links",`<ul><li>Tap the small <b>ℹ</b> next to a unit name in the log (or <b>ℹ UPS details</b> in Batteries, or the Dashboard's <b>Unit details</b>) to save serial number, gateway IP, install date, warranty, manual link, brand website and notes.</li><li><b>🌐 Open gateway</b> opens the network card page — you must be on the same network.</li><li>Links open in your browser and need internet (a gateway IP only needs the site network).</li><li>The register can be exported to CSV and is included in full backups.</li></ul>`)}
@@ -5547,19 +5546,18 @@ function deriveIc(s, clearWhenEmpty){
   }
   return changed;
 }
-/* Load kVA = sum of the unit's 5 Universal Power Module values (V11_19). Runs before the pair
-   total, which is built from Load kVA. Live edits that empty every module also empty the load;
-   the load-time pass never erases a stored value when the modules are blank. */
-function deriveLk(u, clearWhenEmpty){
-  const vals = (u.upm||[]).filter(x=>x!==null && x!==undefined && x!=="" && !isNaN(x)).map(parseFloat);
-  const nv = vals.length ? round1(vals.reduce((a,b)=>a+b,0)) : (clearWhenEmpty ? null : u.lk);
-  if(u.lk!==nv){ const had = (u.lk!==null && u.lk!==undefined); u.lk = nv; return had ? 1 : 0.5; }   // 1 = an existing value changed, 0.5 = newly filled
-  return 0;
-}
 /* Total kVA of a paralleled pair = Load kVA of unit 1 + Load kVA of unit 2. Pairs are
    consecutive rows in each room (1st+2nd, 3rd+4th, …), matching the merged "Total Load KVA"
    cell of the monitoring sheet; the total lives on the first unit of the pair. An odd
    last unit has no partner, so its total is just its own Load kVA. */
+/* Load kVA of a UPS = sum of its five Universal Power Module readings (one decimal).
+   Live edits that empty every module also empty the load; the load-time pass never erases a stored value. */
+function deriveLk(u, clearWhenEmpty){
+  const m = (u.upm||[]).filter(x=>x!==null && x!==undefined && x!=="" && !isNaN(x)).map(parseFloat);
+  const nv = m.length ? round1(m.reduce((a,b)=>a+b,0)) : (clearWhenEmpty ? null : u.lk);
+  if(u.lk!==nv){ const had = (u.lk!==null && u.lk!==undefined); u.lk = nv; return had ? 1 : 0.5; }
+  return 0;
+}
 function deriveTl(room, clearWhenEmpty){
   let changed = 0;
   const ups = room.ups||[];
@@ -5614,7 +5612,8 @@ function autoSyncAll(){
       const before = s.ic.slice();
       if(deriveIc(s,false)){ changed=true; s.ic.forEach((v,x)=>{ if(before[x]!==null && before[x]!==undefined && before[x]!==v) recalced++; }); }
       if(autoInspect(k,"sts",s)) changed=true; });
-    if(room.ups){ room.ups.forEach(u=>{ const r = deriveLk(u,false); if(r){ changed = true; if(r===1) lkRecalced++; } });
+    if(room.ups){
+      room.ups.forEach(u=>{ const d = deriveLk(u,false); if(d>0) changed = true; if(d===1) lkRecalced++; });
       room.ups.__changed = false; tlRecalced += deriveTl(room,false); if(room.ups.__changed) changed = true; delete room.ups.__changed; }
     (room.ups||[]).forEach(u=>{ if(autoInspect(k,"ups",u)) changed=true; });
   });
@@ -5651,13 +5650,10 @@ function autoOnInput(parts, val, el){
     return;
   }
   if(f==="n" || f==="c" || f==="time") return;
-  if(sec==="ups" && (f==="upm" || f==="lk" || f==="tl")){    // modules -> Load kVA -> pair Total kVA (typed/scanned values in the calculated cells are overridden)
-    deriveLk(u,true);
-    const lEl = document.querySelector(`[data-path="${roomKey}.ups.${i}.lk"]`);
-    if(lEl) lEl.value = (u.lk===null||u.lk===undefined) ? "" : u.lk;
-    deriveTl(room,true); delete room.ups.__changed;
-    const first = i - (i%2), tEl = document.querySelector(`[data-path="${roomKey}.ups.${first}.tl"]`);
-    if(tEl) tEl.value = (room.ups[first].tl===null||room.ups[first].tl===undefined) ? "" : room.ups[first].tl;
+  if(sec==="ups" && (f==="upm" || f==="lk" || f==="tl")){     // modules -> Load kVA -> paired Total kVA (typed/scanned values in the calculated cells are overridden)
+    deriveLk(u,true); deriveTl(room,true); delete room.ups.__changed;
+    const put = (idx,fld)=>{ const e = document.querySelector(`[data-path="${roomKey}.ups.${idx}.${fld}"]`); const val = room.ups[idx][fld]; if(e) e.value = (val===null||val===undefined) ? "" : val; };
+    put(i,"lk"); put(i - (i%2),"tl");
   }
   if(sec==="sts" && (f==="lp" || f==="ic")) deriveIc(u,true);   // typed/scanned/voice values in Input Current are overridden by Load % × 4
   autoInspect(roomKey,sec,u);
