@@ -486,6 +486,15 @@
 
   .calc-tag{ margin-left:6px; font:600 9px var(--font-mono); letter-spacing:.04em; color:var(--text-dim); text-transform:none; white-space:nowrap; }
 
+
+  /* ---------- V11_20: GitHub backup ---------- */
+  .gh-banner{ display:flex; flex-wrap:wrap; align-items:center; gap:8px 10px; margin:8px 0 0; padding:10px 12px; border:1px solid var(--amber); background:var(--amber-dim); color:var(--text); border-radius:10px; font-size:13px; line-height:1.4; }
+  .gh-banner .btn{ min-height:34px; padding:5px 12px; } .gh-banner span{ flex:1 1 220px; }
+  .gh-status{ margin:0 0 10px; padding:9px 11px; border:1px solid var(--border-soft); border-radius:8px; background:var(--panel); font:12px/1.6 var(--font-mono); color:var(--text-dim); }
+  .gh-status b{ color:var(--text); } .gh-status .bad{ color:var(--red); } .gh-status .ok{ color:var(--green); } .gh-status .warn{ color:var(--amber); }
+  .gh-actions{ display:flex; flex-wrap:wrap; gap:6px; margin:10px 0 4px; } .gh-actions .btn{ min-height:38px; }
+  .gh-note{ margin-top:8px; font-size:11.5px; line-height:1.5; color:var(--text-dim); }
+
   /* ---------- Print (fallback path only — used if the PDF libraries
      can't be loaded, e.g. no internet on first use). The primary
      export/print/share flow renders a real paginated PDF instead. ---------- */
@@ -980,6 +989,7 @@
 <div class="tabs no-print" id="tabs"></div>
 
 <div class="stage">
+  <div class="gh-banner no-print" id="ghBanner" role="status" style="display:none"></div>
   <div class="zoomwrap" id="zoomWrap">
     <div id="dashHost" aria-live="polite"></div>
     <div id="roomsHost"></div>
@@ -1978,6 +1988,7 @@ function flushSaveNow(){
   }
 }
 function scheduleSave(){
+  if(typeof ghMarkDirty==="function") ghMarkDirty();          // V11_20: tells the GitHub auto-upload there is something new
   const badge = document.getElementById("saveBadge");
   badge.textContent = "saving…"; badge.classList.remove("saved");
   clearTimeout(saveTimer);
@@ -4596,14 +4607,45 @@ function exportCsv(){
    shared over Viber/Telegram) lets one engineer hand off the full
    dataset to another device manually.
    ========================================================= */
-function exportBackup(){
-  const backup = {
+function buildBackupObject(){
+  return {
     kind: "mups-watch-backup", version: 1, exportedAt: new Date().toISOString(),
     roomOrder: ROOM_ORDER.slice(), state: deepClone(STATE),
     assets: deepClone(ASSETS)                       // V11_14: unit details (older backups simply don't have this key)
-  };
-  downloadTextFile("MUPS-Watch-backup-" + new Date().toISOString().slice(0,10) + ".json", JSON.stringify(backup,null,2), "application/json");
+  };                                               // note: the GitHub token / OCR key live in their own keys and are never included
+}
+function exportBackup(){
+  downloadTextFile("MUPS-Watch-backup-" + new Date().toISOString().slice(0,10) + ".json", JSON.stringify(buildBackupObject(),null,2), "application/json");
   logAudit(null, "Exported a full backup file.");
+}
+function parseBackupText(text){
+  let backup;
+  try{ backup = JSON.parse(text); }catch(e){ showInfoModal("Import failed", "That file doesn't look like a valid backup (couldn't parse JSON)."); return null; }
+  if(!backup || backup.kind!=="mups-watch-backup" || !backup.state){ showInfoModal("Import failed", "That file doesn't look like a MUPS Watch backup."); return null; }
+  return backup;
+}
+/* confirm, then replace this device's data with the backup (shared by file import and GitHub restore) */
+function confirmAndApplyBackup(backup, sourceLabel, onApplied){
+  showConfirmModal(
+    "Import this backup?",
+    `${sourceLabel ? sourceLabel+": e" : "E"}xported ${new Date(backup.exportedAt).toLocaleString()}. This replaces ALL current room data on this device — anything unsaved will be lost.`,
+    "Import & replace",
+    ()=>{
+      ROOM_ORDER = (backup.roomOrder && backup.roomOrder.length) ? backup.roomOrder.slice() : DEFAULT_ROOM_ORDER.slice();
+      STATE = deepClone(backup.state);
+      STATE.roomOrder = ROOM_ORDER;
+      if(!STATE.meta) STATE.meta = { nextRoomNum: computeNextRoomNum() };
+      if(!STATE.techRoster || !STATE.techRoster.length) STATE.techRoster = DEFAULT_TECH_ROSTER.slice();
+      ensureBatteryBanksOnState();
+      if(backup.assets && typeof backup.assets==="object"){ Object.assign(ASSETS, backup.assets); saveAssets(); }   // merge, never wipe existing details
+      if(!ROOM_ORDER.includes(ACTIVE)) ACTIVE = ROOM_ORDER[0];
+      logAudit(null, `Imported backup${sourceLabel?" ("+sourceLabel+")":""} from ${new Date(backup.exportedAt).toLocaleString()}.`);
+      renderAll();
+      scheduleSave();
+      if(VIEW==="dashboard") renderDashboard();
+      if(onApplied) onApplied();
+    }
+  );
 }
 function triggerImportBackup(){
   const input = document.createElement("input");
@@ -4612,29 +4654,7 @@ function triggerImportBackup(){
     const file = input.files && input.files[0];
     if(!file) return;
     const reader = new FileReader();
-    reader.onload = ()=>{
-      let backup;
-      try{ backup = JSON.parse(reader.result); }catch(e){ showInfoModal("Import failed", "That file doesn't look like a valid backup (couldn't parse JSON)."); return; }
-      if(!backup || backup.kind!=="mups-watch-backup" || !backup.state){ showInfoModal("Import failed", "That file doesn't look like a MUPS Watch backup."); return; }
-      showConfirmModal(
-        "Import this backup?",
-        `Exported ${new Date(backup.exportedAt).toLocaleString()}. This replaces ALL current room data on this device — anything unsaved will be lost.`,
-        "Import & replace",
-        ()=>{
-          ROOM_ORDER = (backup.roomOrder && backup.roomOrder.length) ? backup.roomOrder.slice() : DEFAULT_ROOM_ORDER.slice();
-          STATE = deepClone(backup.state);
-          STATE.roomOrder = ROOM_ORDER;
-          if(!STATE.meta) STATE.meta = { nextRoomNum: computeNextRoomNum() };
-          if(!STATE.techRoster || !STATE.techRoster.length) STATE.techRoster = DEFAULT_TECH_ROSTER.slice();
-          ensureBatteryBanksOnState();
-          if(backup.assets && typeof backup.assets==="object"){ Object.assign(ASSETS, backup.assets); saveAssets(); }   // merge, never wipe existing details
-          if(!ROOM_ORDER.includes(ACTIVE)) ACTIVE = ROOM_ORDER[0];
-          logAudit(null, `Imported backup from ${new Date(backup.exportedAt).toLocaleString()}.`);
-          renderAll();
-          scheduleSave();
-        }
-      );
-    };
+    reader.onload = ()=>{ const backup = parseBackupText(reader.result); if(backup) confirmAndApplyBackup(backup, "", null); };
     reader.readAsText(file);
   });
   input.click();
@@ -5184,6 +5204,7 @@ function showExportChooser(){
    ========================================================= */
 document.getElementById("btnMoreTools").addEventListener("click", ()=>{
   const commonTail = [
+    { label: "☁ GitHub backup & sync", onClick: ()=>{ openGithubSync(); } },
     { label: "🗂 UPS & STS unit details", onClick: ()=>{ showAssetRegister(); } },
     { label: "📖 Help & user guide", onClick: ()=>{ showHelpGuide(); } },
     { divider:true },
@@ -5299,7 +5320,7 @@ function renderDashboard(){
       <div class="dcard-f"><span>Per-bank detail, remarks and reports</span><button type="button" class="btn ghost" data-go="battery">Open batteries</button></div></section>`;
   host.innerHTML = `
     <div class="dash-banner ${overall}"><h2>${msg}</h2>${sbadge(overall)}
-      <div class="meta">Monitoring: manual log · ${D.upsMon+D.stsMon}/${D.upsTotal+D.stsTotal} units have readings<br>${last?"Last log entry: "+escH(last.date)+" "+escH(last.time)+" ("+escH(last.loc||"")+")":"No log entry dated yet"}${saved?" · "+escH(saved):""}</div></div>
+      <div class="meta">Monitoring: manual log · ${D.upsMon+D.stsMon}/${D.upsTotal+D.stsTotal} units have readings<br>${last?"Last log entry: "+escH(last.date)+" "+escH(last.time)+" ("+escH(last.loc||"")+")":"No log entry dated yet"}${saved?" · "+escH(saved):""}${ghConfigured()?"<br>☁ GitHub backup: "+(GH.lastUpload?escH(new Date(GH.lastUpload).toLocaleString()):"never uploaded")+(GH.dirty?" · changes not uploaded yet":" · up to date")+(GH.remoteNewer?" · ⚠ GitHub has a different version":""):""}</div></div>
     <div class="dash-kpis">
       ${kpi(D.upsTotal,"UPS units"+(D.upsMon<D.upsTotal?` (${D.upsMon} read)`:""))}
       ${kpi(D.stsTotal,"STS units"+(D.stsMon<D.stsTotal?` (${D.stsMon} read)`:""))}
@@ -5505,6 +5526,7 @@ function showHelpGuide(){
    ${sec("🗂 Unit details & links",`<ul><li>Tap the small <b>ℹ</b> next to a unit name in the log (or <b>ℹ UPS details</b> in Batteries, or the Dashboard's <b>Unit details</b>) to save serial number, gateway IP, install date, warranty, manual link, brand website and notes.</li><li><b>🌐 Open gateway</b> opens the network card page — you must be on the same network.</li><li>Links open in your browser and need internet (a gateway IP only needs the site network).</li><li>The register can be exported to CSV and is included in full backups.</li></ul>`)}
    ${sec("🖨 Export, print & share",`<ul><li>Page/tab 1 = Room 4, page/tab 2 = Rooms 1, 2 &amp; 3, laid out like the monitoring sheet. Choose PDF, Excel or Share.</li><li>On phones, <b>print</b> saves the PDF first — open it from Downloads and print from the viewer.</li></ul>`)}
    ${sec("💾 Backup & your data",`<ul><li>Data is stored <b>only on this device</b>. Clearing the browser's site data deletes it.</li><li>Use <b>More → Export full backup (.json)</b> regularly, and share the file to move data to another phone (<b>Import backup</b>).</li><li>Importing a backup replaces room data; unit details are merged in.</li></ul>`)}
+   ${sec("☁ GitHub backup (optional)",`<ul><li><b>More → ☁ GitHub backup &amp; sync</b>: save this device's data as a backup file in a GitHub repository, and restore it later or on another phone.</li><li>Use a separate <b>private</b> repository for backups — your app's own repository is public, and so would the backups be.</li><li>Create a <b>fine-grained access token</b> limited to that one repository with <b>Contents: Read and write</b>, then paste it in the settings. It is stored only on this device and is never included in backups.</li><li><b>Auto-upload</b> sends a backup a couple of minutes after you stop editing (at most every 10 minutes) while the app is open and online. Tap <b>Upload now</b> at the end of a shift to be sure.</li><li>If another device uploaded in the meantime, the app warns you instead of overwriting — you choose to restore theirs or overwrite with yours.</li><li>No internet or no GitHub? <b>More → Import backup</b> still restores from a .json file in any folder.</li></ul>`)}
    ${sec("📶 Offline & installing",`<ul><li>After the first load the app works without internet. Online-only: the PDF engine on first use, AI OCR, and the links.</li><li>The camera works only when the page is opened over <b>https</b> (or localhost), not from a plain file.</li></ul>`)}
    ${sec("⚠ Safety",`<p>This app records readings and notes only. For any bypass, shutdown or battery work, follow the manufacturer's manual and your site's procedures.</p>`)}
    ${links.length ? sec("🔗 Saved manuals & websites",`<ul>${links.join("")}</ul>`) : ""}
@@ -5660,6 +5682,212 @@ function autoOnInput(parts, val, el){
   paintUnitAuto(roomKey,sec,i);
 }
 
+
+/* =========================================================
+   GITHUB BACKUP & SYNC (V11_20)
+   Talks to GitHub's REST "contents" API straight from the page (it allows
+   browser requests). The same backup object as the file export is stored as one
+   JSON file in a repository; GitHub's commit history keeps every earlier version.
+   Settings (incl. the access token) live under their own localStorage key —
+   not in STATE — so they never end up in backups, presets or exports.
+   ========================================================= */
+const GH_KEY = "mups_github_cfg_v1";
+const GH_DEBOUNCE = 120000, GH_MIN_GAP = 600000, GH_RETRY = 300000;
+let GH = (function(){
+  const d = { repo:"", branch:"main", path:"mups-watch/backup.json", token:"", auto:false, lastSha:"", lastUpload:"", lastError:"", dirty:false, remoteNewer:false };
+  try{ const r = Store.get(GH_KEY); if(r && r.value) return Object.assign(d, JSON.parse(r.value)); }catch(e){}
+  return d;
+})();
+let ghTimer = null, ghBusy = false, ghLastCheck = 0;
+function ghSave(){ Store.set(GH_KEY, JSON.stringify(GH)); }
+function ghConfigured(){ return !!(GH.repo && GH.token && /^[\w.-]+\/[\w.-]+$/.test(GH.repo) && GH.path); }
+function ghUrl(){ return `https://api.github.com/repos/${GH.repo}/contents/${GH.path.split("/").map(encodeURIComponent).join("/")}`; }
+function ghHeaders(raw){ return { "Authorization":"Bearer "+GH.token, "Accept": raw ? "application/vnd.github.raw+json" : "application/vnd.github+json", "X-GitHub-Api-Version":"2022-11-28" }; }
+async function ghFetch(url, opts){
+  const ctl = new AbortController(), t = setTimeout(()=>ctl.abort(), 30000);
+  try{ return await fetch(url, Object.assign({ signal:ctl.signal, cache:"no-store" }, opts)); }
+  catch(e){ throw new Error(e.name==="AbortError" ? "GitHub didn't answer in time." : "Couldn't reach GitHub (no internet?)."); }
+  finally{ clearTimeout(t); }
+}
+async function ghError(r){
+  let msg = ""; try{ const j = await r.json(); msg = j.message || ""; }catch(e){}
+  const m = { 401:"GitHub rejected the token (401) — it may be wrong or expired.",
+              403:"GitHub refused (403) — the token needs Contents: Read and write on this repository"+(/rate limit/i.test(msg)?" (or a rate limit was hit)":"")+".",
+              404:"Repository, branch or file not found (404) — check owner/repo and branch, and that the token can see that repository.",
+              409:"GitHub reported a conflict (409) — try again.",
+              422:"GitHub rejected the request (422)"+(msg?": "+msg:"")+"." };
+  const e = new Error(m[r.status] || `GitHub error ${r.status}${msg?": "+msg:""}`); e.status = r.status; return e;
+}
+async function ghMeta(){                                         // does the file exist, and what is its version (sha)?
+  const r = await ghFetch(ghUrl()+"?ref="+encodeURIComponent(GH.branch||"main"), { headers:ghHeaders(false) });
+  if(r.status===404){
+    const rr = await ghFetch(`https://api.github.com/repos/${GH.repo}`, { headers:ghHeaders(false) });     // 404 = no file, or no repo/access?
+    if(!rr.ok) throw await ghError(rr);
+    return { exists:false };
+  }
+  if(!r.ok) throw await ghError(r);
+  const j = await r.json();
+  if(Array.isArray(j)) throw new Error("That path is a folder, not a file — use something like mups-watch/backup.json.");
+  return { exists:true, sha:j.sha, size:j.size };
+}
+function toB64(str){ const bytes = new TextEncoder().encode(str); let bin = ""; for(let i=0;i<bytes.length;i+=0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i,i+0x8000)); return btoa(bin); }
+async function ghUpload(opts){
+  opts = opts || {};
+  const meta = await ghMeta();
+  if(meta.exists && !opts.force && (!GH.lastSha || meta.sha!==GH.lastSha)) return { conflict:true, first:!GH.lastSha, meta };
+  const body = { message:`MUPS Watch backup ${new Date().toISOString()} (${opts.auto?"auto":"manual"})`, content:toB64(JSON.stringify(buildBackupObject())), branch:GH.branch||"main" };
+  if(meta.exists) body.sha = meta.sha;
+  const r = await ghFetch(ghUrl(), { method:"PUT", headers:Object.assign({"Content-Type":"application/json"}, ghHeaders(false)), body:JSON.stringify(body) });
+  if(!r.ok) throw await ghError(r);
+  const j = await r.json();
+  GH.lastSha = j.content && j.content.sha || ""; GH.lastUpload = new Date().toISOString(); GH.dirty = false; GH.remoteNewer = false; GH.lastError = ""; ghSave();
+  try{ logAudit(null, `Uploaded backup to GitHub (${GH.repo}).`); }catch(e){}
+  ghHideBanner();
+  return { ok:true };
+}
+async function ghFetchBackup(){
+  const meta = await ghMeta();
+  if(!meta.exists) throw new Error("There is no backup file at that path on GitHub yet — upload one first.");
+  const r = await ghFetch(ghUrl()+"?ref="+encodeURIComponent(GH.branch||"main"), { headers:ghHeaders(true) });
+  if(!r.ok) throw await ghError(r);
+  return { text: await r.text(), meta };
+}
+async function ghRestoreFlow(){
+  try{
+    showToast("⏳ Fetching backup from GitHub…", 60000);
+    const { text, meta } = await ghFetchBackup(); showToast("", 1);
+    const backup = parseBackupText(text); if(!backup) return;
+    confirmAndApplyBackup(backup, "GitHub", ()=>{ GH.lastSha = meta.sha; GH.dirty = false; GH.remoteNewer = false; GH.lastError = ""; ghSave(); ghHideBanner(); ghRefreshStatus(); });
+  }catch(e){ showToast("", 1); showInfoModal("Couldn't restore from GitHub", e.message); }
+}
+function ghConflictModal(res){
+  let close = null; const go = fn => ()=>{ if(close) close(); fn(); };
+  close = showModal("GitHub already has a backup",
+    res.first ? "A backup file already exists in that repository and this device hasn't synced with it yet. Replacing it with this device's data cannot be undone from the app (GitHub keeps older versions in its history)."
+              : "The backup on GitHub changed since this device last synced — probably uploaded from another device. Overwriting it replaces that newer data (GitHub keeps older versions in its history).",
+    [ { label:"⬇ Restore the GitHub backup here", cls:"primary", onClick:go(ghRestoreFlow) },
+      { label:"⬆ Overwrite GitHub with this device", cls:"warn", onClick:go(()=>ghUploadFlow(true)) } ]);
+}
+async function ghUploadFlow(force){
+  if(ghBusy) return; ghBusy = true;
+  try{
+    showToast("⏳ Uploading to GitHub…", 60000);
+    const res = await ghUpload({ force:!!force });
+    showToast("", 1);
+    if(res.conflict){ GH.remoteNewer = !res.first; ghSave(); ghConflictModal(res); }
+    else showToast("✓ Backup uploaded to GitHub", 2500);
+  }catch(e){ showToast("", 1); GH.lastError = e.message; ghSave(); showInfoModal("Couldn't upload to GitHub", e.message); }
+  finally{ ghBusy = false; ghRefreshStatus(); if(VIEW==="dashboard") renderDashboard(); }
+}
+/* ---- automatic upload ---- */
+function ghMarkDirty(){ if(!GH.dirty){ GH.dirty = true; ghSave(); } ghSchedule(GH_DEBOUNCE); }
+function ghSchedule(ms){
+  clearTimeout(ghTimer); if(!GH.auto || !ghConfigured() || !GH.dirty) return;
+  const since = GH.lastUpload ? Date.now() - new Date(GH.lastUpload).getTime() : Infinity;
+  ghTimer = setTimeout(ghAutoRun, Math.max(ms, GH_MIN_GAP - since));
+}
+async function ghAutoRun(){
+  if(!GH.auto || !GH.dirty || !ghConfigured() || GH.remoteNewer || !navigator.onLine) return;       // 'online' event re-arms it
+  if(ghBusy){ ghSchedule(30000); return; }
+  ghBusy = true;
+  try{
+    const res = await ghUpload({ auto:true });
+    if(res.conflict){ GH.remoteNewer = true; ghSave(); ghShowBanner(); }                           // never silently overwrite another device
+    else showToast("☁ Backed up to GitHub", 1500);
+  }catch(e){ GH.lastError = e.message; ghSave(); ghSchedule(GH_RETRY); }
+  finally{ ghBusy = false; ghRefreshStatus(); if(typeof VIEW!=="undefined" && VIEW==="dashboard") renderDashboard(); }
+}
+async function ghCheckRemote(){
+  if(!ghConfigured() || !navigator.onLine || ghBusy || Date.now()-ghLastCheck < 30000){ if(GH.dirty) ghSchedule(GH_DEBOUNCE); return; }
+  ghLastCheck = Date.now();
+  try{
+    const m = await ghMeta();
+    if(m.exists && GH.lastSha && m.sha!==GH.lastSha){ GH.remoteNewer = true; ghSave(); ghShowBanner(); }
+    else if(m.exists && m.sha===GH.lastSha){ GH.remoteNewer = false; ghSave(); ghHideBanner(); }
+  }catch(e){ /* quiet: the status panel shows errors when asked */ }
+  if(GH.dirty) ghSchedule(GH_DEBOUNCE);
+}
+window.addEventListener("online", ()=>{ ghCheckRemote(); if(GH.dirty) ghSchedule(5000); });
+document.addEventListener("visibilitychange", ()=>{
+  if(document.visibilityState==="hidden"){
+    const since = GH.lastUpload ? Date.now() - new Date(GH.lastUpload).getTime() : Infinity;
+    if(GH.auto && GH.dirty && since > 60000){ clearTimeout(ghTimer); ghAutoRun(); }                 // best effort when the app is backgrounded
+  } else ghCheckRemote();
+});
+document.addEventListener("assets-changed", ()=>{ if(typeof ghMarkDirty==="function") ghMarkDirty(); });
+/* ---- banner ---- */
+function ghShowBanner(){
+  const el = document.getElementById("ghBanner"); if(!el) return;
+  el.innerHTML = `<span>☁ The GitHub backup is different from what this device last synced (another device uploaded, or it was changed there). Auto-upload is paused so nothing gets overwritten.</span>
+    <button type="button" class="btn primary" data-gh="restore">⬇ Restore it</button><button type="button" class="btn" data-gh="overwrite">⬆ Overwrite with mine</button><button type="button" class="btn ghost" data-gh="later">Later</button>`;
+  el.style.display = "";
+}
+function ghHideBanner(){ const el = document.getElementById("ghBanner"); if(el) el.style.display = "none"; }
+document.getElementById("ghBanner").addEventListener("click",(e)=>{
+  const b = e.target.closest("[data-gh]"); if(!b) return; const a = b.getAttribute("data-gh");
+  if(a==="restore") ghRestoreFlow(); else if(a==="overwrite") ghUploadFlow(true); else ghHideBanner();
+});
+/* ---- settings / actions window ---- */
+function ghStatusHtml(){
+  const rows = [];
+  if(!ghConfigured()) rows.push(`<span class="warn">Not set up yet</span> — enter the repository and token below.`);
+  else rows.push(`<b>${escH(GH.repo)}</b> · ${escH(GH.branch||"main")} · <b>${escH(GH.path)}</b>`);
+  rows.push(`Last upload: <b>${GH.lastUpload ? escH(new Date(GH.lastUpload).toLocaleString()) : "never"}</b>`);
+  if(ghConfigured()) rows.push(GH.dirty ? `<span class="warn">Changes on this device are not uploaded yet</span>` : (GH.lastUpload ? `<span class="ok">This device is up to date with GitHub</span>` : ""));
+  rows.push(`Auto-upload: <b>${GH.auto ? "on" : "off"}</b>`);
+  if(GH.remoteNewer) rows.push(`<span class="warn">⚠ GitHub has a different version than this device last synced</span>`);
+  if(GH.lastError) rows.push(`<span class="bad">Last error: ${escH(GH.lastError)}</span>`);
+  return rows.filter(Boolean).join("<br>");
+}
+function ghRefreshStatus(){ const el = document.getElementById("ghStatus"); if(el) el.innerHTML = ghStatusHtml(); }
+function openGithubSync(){
+  const fld = (id,label,type,ph,val,extra)=>`<div class="field-group"><label for="gh_${id}">${label}</label><input class="cell-input" style="width:100%;text-align:left" id="gh_${id}" type="${type}" placeholder="${ph}" value="${escH(val)}" ${extra||""}></div>`;
+  const body = `<div class="gh-status" id="ghStatus">${ghStatusHtml()}</div>
+    ${fld("repo","Repository (owner/name)","text","e.g. myname/mups-backups",GH.repo,'autocapitalize="none" autocomplete="off" spellcheck="false"')}
+    ${fld("branch","Branch","text","main",GH.branch,'autocapitalize="none" autocomplete="off"')}
+    ${fld("path","Backup file path","text","mups-watch/backup.json",GH.path,'autocapitalize="none" autocomplete="off"')}
+    ${fld("token","Access token","password","github_pat_…",GH.token,'autocomplete="off"')}
+    <div class="field-group"><label for="gh_auto">Auto-upload</label><select class="cell-input" id="gh_auto" style="width:100%"><option value="0" ${GH.auto?"":"selected"}>Off — upload only when I tap Upload now</option><option value="1" ${GH.auto?"selected":""}>On — after I stop editing (max every 10 min)</option></select></div>
+    <div class="gh-actions"><button type="button" class="btn ghost" data-gh="test">🔌 Test connection</button><button type="button" class="btn" data-gh="up">⬆ Upload now</button><button type="button" class="btn" data-gh="down">⬇ Restore from GitHub</button><button type="button" class="btn ghost" data-gh="file">📁 Restore from a file…</button></div>
+    <div class="gh-note">Use a <b>private</b> repository just for backups, and a fine-grained token limited to it with <b>Contents: Read and write</b>. The token stays on this device only and is not part of any backup. GitHub keeps every earlier backup in the repository's commit history.</div>`;
+  const { backdrop, close } = showFormModal("GitHub backup & sync", "Back up this device's data to GitHub and restore it later or on another phone.", body, "Save settings", (bd, closeFn)=>{
+    if(!readCfg(bd, true)) return; closeFn(); showToast("✓ GitHub settings saved", 1500); if(VIEW==="dashboard") renderDashboard();
+  });
+  backdrop.querySelector(".modal-card").classList.add("wide");
+  function status(msg, bad){ const el = backdrop.querySelector(".modal-form-status"); el.style.display = ""; el.textContent = msg; el.style.color = bad ? "var(--red)" : "var(--green)"; }
+  function readCfg(bd, strict){
+    const v = id => bd.querySelector("#gh_"+id).value.trim();
+    const repo = v("repo").replace(/^https?:\/\/github\.com\//i,"").replace(/\.git$/i,"").replace(/\/+$/,""), path = v("path").replace(/^\/+/,"");
+    if(strict || repo || v("token")){
+      if(!/^[\w.-]+\/[\w.-]+$/.test(repo)){ status("Enter the repository as owner/name, e.g. myname/mups-backups.", true); return false; }
+      if(!path || /\/$/.test(path)){ status("Enter a file path such as mups-watch/backup.json.", true); return false; }
+      if(!v("token")){ status("Paste the access token.", true); return false; }
+    }
+    const was = GH.auto; GH.repo = repo; GH.branch = v("branch") || "main"; GH.path = path || "mups-watch/backup.json"; GH.token = v("token"); GH.auto = v("auto")==="1";
+    ghSave(); ghRefreshStatus(); if(GH.auto && !was) ghCheckRemote().then(()=>ghSchedule(5000)); else ghSchedule(GH_DEBOUNCE);
+    return true;
+  }
+  backdrop.addEventListener("click", async (e)=>{
+    const b = e.target.closest("[data-gh]"); if(!b) return; const a = b.getAttribute("data-gh");
+    if(a==="file"){ close(); triggerImportBackup(); return; }
+    if(!readCfg(backdrop, true)) return;
+    if(a==="test"){
+      try{
+        status("Checking…", false);
+        const rr = await ghFetch(`https://api.github.com/repos/${GH.repo}`, { headers:ghHeaders(false) });
+        if(!rr.ok) throw await ghError(rr);
+        const info = await rr.json(), meta = await ghMeta();
+        const warn = info.private===false ? " ⚠ This repository is PUBLIC — anyone can read the backups. Use a private one." : "";
+        const ro = (info.permissions && info.permissions.push===false) ? " ⚠ The token looks read-only — uploads will fail." : "";
+        status(`✓ Connected to ${info.full_name}${info.private?" (private)":""}. ${meta.exists?"A backup file is already there.":"No backup file yet — Upload now will create it."}${warn}${ro}`, !!(warn||ro) ? true : false);
+        GH.lastError = ""; ghSave(); ghRefreshStatus();
+      }catch(err){ GH.lastError = err.message; ghSave(); ghRefreshStatus(); status(err.message, true); }
+    } else if(a==="up"){ close(); ghUploadFlow(false); }
+    else if(a==="down"){ close(); ghRestoreFlow(); }
+  });
+}
+window.openGithubSync = openGithubSync;
+
 (async function init(){
   applyTheme();
   await loadState();
@@ -5672,6 +5900,8 @@ function autoOnInput(parts, val, el){
   initReticleInteraction();
   refreshStatusDot();
   setView("dashboard");      // open on the health overview
+  if(GH.remoteNewer) ghShowBanner();
+  ghCheckRemote();           // V11_20: warn if GitHub has a newer backup; also arms auto-upload for unsent changes
 })();
 
 })();
