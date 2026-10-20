@@ -495,6 +495,14 @@
   .gh-actions{ display:flex; flex-wrap:wrap; gap:6px; margin:10px 0 4px; } .gh-actions .btn{ min-height:38px; }
   .gh-note{ margin-top:8px; font-size:11.5px; line-height:1.5; color:var(--text-dim); }
 
+
+  /* ---------- V11_21: links & app download ---------- */
+  .anchored-menu{ max-height:calc(100vh - 16px); overflow-y:auto; }
+  .alinks button{ display:inline-flex; align-items:center; justify-content:center; min-width:40px; min-height:40px; background:none; border:0; color:var(--text-dim); font-size:16px; cursor:pointer; }
+  .alinks button:hover{ color:var(--red); }
+  .lk-app{ margin-bottom:12px; padding:10px 12px; border:1px solid var(--border-soft); border-radius:10px; background:var(--panel); }
+  .lk-app .gh-actions{ margin:8px 0 0; }
+
   /* ---------- Print (fallback path only — used if the PDF libraries
      can't be loaded, e.g. no internet on first use). The primary
      export/print/share flow renders a real paginated PDF instead. ---------- */
@@ -4611,7 +4619,8 @@ function buildBackupObject(){
   return {
     kind: "mups-watch-backup", version: 1, exportedAt: new Date().toISOString(),
     roomOrder: ROOM_ORDER.slice(), state: deepClone(STATE),
-    assets: deepClone(ASSETS)                       // V11_14: unit details (older backups simply don't have this key)
+    assets: deepClone(ASSETS),                      // V11_14: unit details (older backups simply don't have this key)
+    links: deepClone(LINKS)                         // V11_21: saved links + app download link
   };                                               // note: the GitHub token / OCR key live in their own keys and are never included
 }
 function exportBackup(){
@@ -4638,6 +4647,7 @@ function confirmAndApplyBackup(backup, sourceLabel, onApplied){
       if(!STATE.techRoster || !STATE.techRoster.length) STATE.techRoster = DEFAULT_TECH_ROSTER.slice();
       ensureBatteryBanksOnState();
       if(backup.assets && typeof backup.assets==="object"){ Object.assign(ASSETS, backup.assets); saveAssets(); }   // merge, never wipe existing details
+      mergeLinks(backup.links);                                                                                        // add links we don't have yet; keep ours
       if(!ROOM_ORDER.includes(ACTIVE)) ACTIVE = ROOM_ORDER[0];
       logAudit(null, `Imported backup${sourceLabel?" ("+sourceLabel+")":""} from ${new Date(backup.exportedAt).toLocaleString()}.`);
       renderAll();
@@ -5235,7 +5245,7 @@ document.getElementById("btnMoreTools").addEventListener("click", ()=>{
   ];
   const mt = document.getElementById("btnMoreTools");
   const anchor = (mt.offsetParent !== null) ? mt : document.getElementById("navSettings");   // phones use the bottom-nav Settings button
-  showAnchoredMenu(anchor, VIEW==="battery" ? [...batteryOnly, ...commonTail] : [...logOnly, ...commonTail]);
+  showAnchoredMenu(anchor, VIEW==="battery" ? [...linkMenuItems(), ...batteryOnly, ...commonTail] : [...linkMenuItems(), ...logOnly, ...commonTail]);   // app download + saved links sit at the top
 });
 
 
@@ -5526,6 +5536,7 @@ function showHelpGuide(){
    ${sec("🗂 Unit details & links",`<ul><li>Tap the small <b>ℹ</b> next to a unit name in the log (or <b>ℹ UPS details</b> in Batteries, or the Dashboard's <b>Unit details</b>) to save serial number, gateway IP, install date, warranty, manual link, brand website and notes.</li><li><b>🌐 Open gateway</b> opens the network card page — you must be on the same network.</li><li>Links open in your browser and need internet (a gateway IP only needs the site network).</li><li>The register can be exported to CSV and is included in full backups.</li></ul>`)}
    ${sec("🖨 Export, print & share",`<ul><li>Page/tab 1 = Room 4, page/tab 2 = Rooms 1, 2 &amp; 3, laid out like the monitoring sheet. Choose PDF, Excel or Share.</li><li>On phones, <b>print</b> saves the PDF first — open it from Downloads and print from the viewer.</li></ul>`)}
    ${sec("💾 Backup & your data",`<ul><li>Data is stored <b>only on this device</b>. Clearing the browser's site data deletes it.</li><li>Use <b>More → Export full backup (.json)</b> regularly, and share the file to move data to another phone (<b>Import backup</b>).</li><li>Importing a backup replaces room data; unit details are merged in.</li></ul>`)}
+   ${sec("🔗 Links & app download",`<ul><li><b>More → ⬇ Download app</b> saves the app file to this device so you can keep a copy or install it on another phone. Set the download link once under <b>More → 🔗 Manage links…</b> (a GitHub Pages, raw.githubusercontent.com or release link works). With no link set and the app opened from a web address, it saves a copy of itself instead.</li><li>Add any other links you need (manuals, brand sites, your repository…). They show up in the More menu, and are saved in full backups.</li></ul>`)}
    ${sec("☁ GitHub backup (optional)",`<ul><li><b>More → ☁ GitHub backup &amp; sync</b>: save this device's data as a backup file in a GitHub repository, and restore it later or on another phone.</li><li>Use a separate <b>private</b> repository for backups — your app's own repository is public, and so would the backups be.</li><li>Create a <b>fine-grained access token</b> limited to that one repository with <b>Contents: Read and write</b>, then paste it in the settings. It is stored only on this device and is never included in backups.</li><li><b>Auto-upload</b> sends a backup a couple of minutes after you stop editing (at most every 10 minutes) while the app is open and online. Tap <b>Upload now</b> at the end of a shift to be sure.</li><li>If another device uploaded in the meantime, the app warns you instead of overwriting — you choose to restore theirs or overwrite with yours.</li><li>No internet or no GitHub? <b>More → Import backup</b> still restores from a .json file in any folder.</li></ul>`)}
    ${sec("📶 Offline & installing",`<ul><li>After the first load the app works without internet. Online-only: the PDF engine on first use, AI OCR, and the links.</li><li>The camera works only when the page is opened over <b>https</b> (or localhost), not from a plain file.</li></ul>`)}
    ${sec("⚠ Safety",`<p>This app records readings and notes only. For any bypass, shutdown or battery work, follow the manufacturer's manual and your site's procedures.</p>`)}
@@ -5827,7 +5838,7 @@ document.getElementById("ghBanner").addEventListener("click",(e)=>{
   const b = e.target.closest("[data-gh]"); if(!b) return; const a = b.getAttribute("data-gh");
   if(a==="restore") ghRestoreFlow(); else if(a==="overwrite") ghUploadFlow(true); else ghHideBanner();
 });
-/* ---- settings / actions windowv ---- */
+/* ---- settings / actions window ---- */
 function ghStatusHtml(){
   const rows = [];
   if(!ghConfigured()) rows.push(`<span class="warn">Not set up yet</span> — enter the repository and token below.`);
@@ -5887,6 +5898,108 @@ function openGithubSync(){
   });
 }
 window.openGithubSync = openGithubSync;
+
+
+/* =========================================================
+   LINKS & APP DOWNLOAD (V11_21)
+   One configurable "download the app" link plus any number of saved links,
+   shown in the More menu. Stored under their own key; http(s) only.
+   ========================================================= */
+const LINKS_KEY = "mups_links_v1";
+let LINKS = (function(){
+  const d = { app:{ url:"" }, links:[] };
+  try{ const r = Store.get(LINKS_KEY); if(r && r.value){ const o = JSON.parse(r.value); if(o && typeof o==="object") return { app:{ url:(o.app&&o.app.url)||"" }, links:Array.isArray(o.links) ? o.links.filter(l=>l&&l.url) : [] }; } }catch(e){}
+  return d;
+})();
+function saveLinks(){ return !!Store.set(LINKS_KEY, JSON.stringify(LINKS)); }
+function cleanUrl(v){ v = normUrl(v); return validUrl(v) ? v : ""; }
+function mergeLinks(inc){
+  if(!inc || typeof inc!=="object") return;
+  if(!LINKS.app.url && inc.app && cleanUrl(inc.app.url)) LINKS.app.url = cleanUrl(inc.app.url);
+  (Array.isArray(inc.links) ? inc.links : []).forEach(l=>{ const u = l && cleanUrl(l.url); if(u && !LINKS.links.some(x=>x.url===u)) LINKS.links.push({ label:String(l.label||u).slice(0,80), url:u }); });
+  saveLinks();
+}
+/* github.com/<user>/<repo>/blob/<branch>/<file> is a code viewer page; the same file's raw address downloads */
+function toDirectUrl(u){
+  const m = u.match(/^https:\/\/github\.com\/([^\/]+)\/([^\/]+)\/blob\/([^\/]+)\/(.+)$/i);
+  return m ? `https://raw.githubusercontent.com/${m[1]}/${m[2]}/${m[3]}/${m[4]}` : u;
+}
+function fileNameFor(u){
+  let n = ""; try{ n = decodeURIComponent(new URL(u).pathname.split("/").filter(Boolean).pop()||""); }catch(e){}
+  if(!n) n = "mups-watch.html"; if(!/\.[A-Za-z0-9]{2,5}$/.test(n)) n += ".html"; return n;
+}
+function linkHost(u){ try{ return new URL(u).hostname.replace(/^www\./,""); }catch(e){ return u; } }
+function openLink(u){ window.open(u, "_blank", "noopener,noreferrer"); }
+async function downloadApp(){
+  const link = LINKS.app.url ? cleanUrl(LINKS.app.url) : "";
+  const getAndSave = async (url, name)=>{
+    showToast("⏳ Downloading the app…", 60000);
+    const r = await fetch(url, { cache:"no-store" }); if(!r.ok) throw new Error("HTTP "+r.status);
+    const blob = new Blob([await r.text()], { type:"text/html" }); showToast("", 1);
+    saveBlobAs(blob, name); showToast("✓ App saved to Downloads", 2500);
+  };
+  if(link){
+    try{ await getAndSave(toDirectUrl(link), fileNameFor(toDirectUrl(link))); return; }
+    catch(e){ showToast("", 1); openLink(link); showToast("Couldn't save it directly — opened the link, save the file from there.", 4500); return; }
+  }
+  if(/^https?:$/.test(location.protocol)){                       // served from a web address: save a copy of this very file
+    try{ await getAndSave(location.href.split("#")[0], fileNameFor(location.href.split("#")[0].replace(/\/$/,"/mups-watch.html"))); return; }
+    catch(e){ showToast("", 1); }
+  }
+  showInfoModal("Set the app download link", "No download link is saved yet. Open More → 🔗 Manage links… and paste the address of the app file on GitHub (for example your GitHub Pages address or a raw.githubusercontent.com link).");
+}
+function linkMenuItems(){
+  const items = [ { label: "⬇ Download app", onClick: ()=>{ downloadApp(); } } ];
+  const shown = LINKS.links.slice(0,6);
+  if(shown.length) items.push({ divider:true });
+  shown.forEach(l=>items.push({ label: "🔗 "+escH(l.label||linkHost(l.url)), onClick: ()=>openLink(l.url) }));
+  items.push({ label: "🔗 Manage links…", onClick: ()=>{ openLinksManager(); } });
+  items.push({ divider:true });
+  return items;
+}
+function openLinkEditor(idx){
+  const cur = idx>=0 ? LINKS.links[idx] : { label:"", url:"" };
+  const fld = (id,label,type,ph,val)=>`<div class="field-group"><label for="lk_${id}">${label}</label><input class="cell-input" style="width:100%;text-align:left" id="lk_${id}" type="${type}" placeholder="${ph}" value="${escH(val)}" autocomplete="off" autocapitalize="none" spellcheck="false"></div>`;
+  const { backdrop } = showFormModal(idx>=0 ? "Edit link" : "Add link", "Web addresses starting with https:// or http:// (a missing https:// is added for you).",
+    fld("label","Name","text","e.g. Eaton 93PR manual",cur.label)+fld("url","Link","url","https://…",cur.url),
+    "Save link", (bd, closeFn)=>{
+      const label = bd.querySelector("#lk_label").value.trim(), url = cleanUrl(bd.querySelector("#lk_url").value);
+      const st = bd.querySelector(".modal-form-status");
+      if(!url){ st.style.display=""; st.style.color="var(--red)"; st.textContent="Enter a valid web address (https://…)."; return; }
+      const rec = { label: label || linkHost(url), url };
+      if(idx>=0) LINKS.links[idx] = rec; else LINKS.links.push(rec);
+      if(!saveLinks()){ st.style.display=""; st.style.color="var(--red)"; st.textContent="Couldn't save — browser storage is full or blocked."; return; }
+      closeFn(); openLinksManager();
+    });
+  setTimeout(()=>{ const f = backdrop.querySelector("#lk_label"); if(f) f.focus(); }, 50);
+}
+function openLinksManager(){
+  const rows = LINKS.links.map((l,i)=>`<div class="arow"><button type="button" class="arow-main" data-lk="edit" data-i="${i}"><b>${escH(l.label||linkHost(l.url))}</b><span class="adesc">${escH(l.url)}</span></button><span class="alinks"><a href="${escH(l.url)}" target="_blank" rel="noopener noreferrer" title="Open" aria-label="Open ${escH(l.label||l.url)}">↗</a><button type="button" data-lk="del" data-i="${i}" title="Delete" aria-label="Delete link">🗑</button></span></div>`).join("")
+    || '<div class="sub" style="padding:8px;color:var(--text-dim)">No links yet — tap “+ Add link”.</div>';
+  const body = `<div class="lk-app"><div class="field-group"><label for="lk_app">App download link</label><input class="cell-input" style="width:100%;text-align:left" id="lk_app" type="url" placeholder="https://…/ups_monitor.html" value="${escH(LINKS.app.url)}" autocomplete="off" autocapitalize="none" spellcheck="false"></div>
+      <div class="gh-actions"><button type="button" class="btn primary" data-lk="saveapp">Save app link</button><button type="button" class="btn" data-lk="dl">⬇ Download app</button><button type="button" class="btn ghost" data-lk="openapp">↗ Open</button></div>
+      <div class="gh-note">Use the address of the app file in your GitHub repository — a GitHub Pages address, a raw.githubusercontent.com link, or a release file. A normal github.com/…/blob/… page link is converted to its raw file automatically.</div></div>
+    <div class="dsec" style="padding-left:0">My links</div>${rows}`;
+  const { backdrop, close } = showFormModal("Links & app download", "Shown in the More menu. Saved with your backups.", body, "+ Add link", (bd, closeFn)=>{ closeFn(); openLinkEditor(-1); });
+  backdrop.querySelector(".modal-card").classList.add("wide");
+  const note = (msg, bad)=>{ const el = backdrop.querySelector(".modal-form-status"); el.style.display=""; el.textContent = msg; el.style.color = bad ? "var(--red)" : "var(--green)"; };
+  backdrop.addEventListener("click",(e)=>{
+    const b = e.target.closest("[data-lk]"); if(!b) return; const a = b.getAttribute("data-lk"), i = +b.getAttribute("data-i");
+    if(a==="saveapp" || a==="dl" || a==="openapp"){
+      const raw = backdrop.querySelector("#lk_app").value.trim(), u = raw ? cleanUrl(raw) : "";
+      if(raw && !u){ note("That doesn't look like a valid web address (https://…).", true); return; }
+      LINKS.app.url = u; saveLinks();
+      if(a==="saveapp") note(u ? "✓ App link saved." : "App link cleared.", false);
+      else if(a==="dl"){ close(); downloadApp(); }
+      else if(u) openLink(u); else note("Enter the app link first.", true);
+    } else if(a==="edit"){ close(); openLinkEditor(i); }
+    else if(a==="del"){
+      const l = LINKS.links[i]; if(!l) return;
+      close(); showConfirmModal("Delete this link?", `${l.label||l.url}`, "Delete", ()=>{ LINKS.links.splice(i,1); saveLinks(); openLinksManager(); });
+    }
+  });
+}
+window.openLinksManager = openLinksManager;
 
 (async function init(){
   applyTheme();
