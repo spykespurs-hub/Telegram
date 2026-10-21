@@ -496,6 +496,11 @@
   .gh-note{ margin-top:8px; font-size:11.5px; line-height:1.5; color:var(--text-dim); }
 
 
+
+  /* ---------- V11_22: Telegram + open-in-Chrome ---------- */
+  .tg-banner{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:10px 14px;background:#3a2f1c;color:#FBE0AC;border-bottom:1px solid #7A5A22;font-size:13px;line-height:1.4}
+  .tg-banner span{flex:1 1 220px}
+  .tg-banner .btn{padding:6px 10px}
   /* ---------- V11_21: links & app download ---------- */
   .anchored-menu{ max-height:calc(100vh - 16px); overflow-y:auto; }
   .alinks button{ display:inline-flex; align-items:center; justify-content:center; min-width:40px; min-height:40px; background:none; border:0; color:var(--text-dim); font-size:16px; cursor:pointer; }
@@ -3570,6 +3575,7 @@ function playAlarmBeep(){
   }catch(e){ /* Web Audio unavailable — fail silently */ }
 }
 function triggerAlarmAlert(roomKey){
+  try{ tgAlertRoom(roomKey); }catch(e){}
   if(!ALERTS_ENABLED) return;
   playAlarmBeep();
   const room = STATE[roomKey];
@@ -5206,7 +5212,8 @@ function showExportChooser(){
     "Choose the output format. Both follow the same monitoring-sheet layout: page/tab 1 = Room 4, page/tab 2 = Rooms 1, 2 &amp; 3.",
     [ {label:"🖨 PDF — print or save",cls:"primary",onClick:go(printPdfNow)},
       {label:"📊 Excel (.xlsx)",cls:"warn",onClick:go(exportExcelTemplate)},
-      {label:"📤 Share PDF (Viber, Telegram, …)",cls:"ghost",onClick:go(shareCurrentPdf)} ]);
+      {label:"📤 Share PDF (Viber, Telegram, …)",cls:"ghost",onClick:go(shareCurrentPdf)},
+      {label:"📨 Send PDF to my Telegram bot",cls:"ghost",onClick:go(()=>tgSendPdf())} ]);
 }
 
 /* =========================================================
@@ -5215,6 +5222,7 @@ function showExportChooser(){
 document.getElementById("btnMoreTools").addEventListener("click", ()=>{
   const commonTail = [
     { label: "☁ GitHub backup & sync", onClick: ()=>{ openGithubSync(); } },
+    { label: "📨 Telegram bot" + (TG.alerts ? " (alerts on)" : ""), onClick: ()=>{ openTelegramSettings(); } },
     { label: "🗂 UPS & STS unit details", onClick: ()=>{ showAssetRegister(); } },
     { label: "📖 Help & user guide", onClick: ()=>{ showHelpGuide(); } },
     { divider:true },
@@ -5899,6 +5907,167 @@ function openGithubSync(){
 }
 window.openGithubSync = openGithubSync;
 
+
+
+/* =========================================================
+   TELEGRAM + OPEN IN CHROME (V11_22)
+   ========================================================= */
+const TG_KEY = "mups_telegram_cfg_v1", TG_Q_KEY = "mups_telegram_queue_v1";
+let TG = (function(){
+  const d = { token:"", chat:"", thread:"", alerts:false, lastError:"" };
+  try{ const r = Store.get(TG_KEY); if(r && r.value) return Object.assign(d, JSON.parse(r.value)); }catch(e){}
+  return d;
+})();
+function tgSave(){ Store.set(TG_KEY, JSON.stringify(TG)); }
+function tgReady(){ return !!(TG.token && TG.chat); }
+async function tgApi(method, params){
+  const r = await fetch("https://api.telegram.org/bot"+TG.token+"/"+method, { method:"POST", body:params });
+  let j = null; try{ j = await r.json(); }catch(e){}
+  if(!r.ok || !j || !j.ok) throw new Error("Telegram: " + ((j && j.description) || ("HTTP "+r.status)));
+  return j.result;
+}
+function tgParams(extra){
+  const p = new URLSearchParams(); p.set("chat_id", TG.chat);
+  if(TG.thread) p.set("message_thread_id", TG.thread);
+  Object.keys(extra||{}).forEach(k=>p.set(k, extra[k]));
+  return p;
+}
+function tgQueueGet(){ try{ return JSON.parse(localStorage.getItem(TG_Q_KEY)||"[]"); }catch(e){ return []; } }
+function tgQueueSet(a){ try{ localStorage.setItem(TG_Q_KEY, JSON.stringify(a.slice(-30))); }catch(e){} }
+async function tgSendText(text, queueIfFail){
+  if(!tgReady()) throw new Error("Telegram is not set up (More → Telegram bot).");
+  try{ await tgApi("sendMessage", tgParams({ text:text })); TG.lastError=""; tgSave(); }
+  catch(e){
+    TG.lastError = e.message; tgSave();
+    if(queueIfFail){ const q = tgQueueGet(); q.push(text); tgQueueSet(q); }
+    throw e;
+  }
+}
+async function tgFlushQueue(){
+  if(!tgReady() || !navigator.onLine) return;
+  let q = tgQueueGet(); if(!q.length) return;
+  tgQueueSet([]);
+  for(let i=0;i<q.length;i++){ try{ await tgSendText(q[i], false); }catch(e){ tgQueueSet(q.slice(i)); return; } }
+}
+window.addEventListener("online", ()=>{ tgFlushQueue(); });
+
+async function tgSendPdf(modeOverride){
+  if(!tgReady()){ showInfoModal("Telegram not set up","Open More → 📨 Telegram bot, enter the bot token and chat ID, then try again."); return; }
+  const mode = (typeof modeOverride==="string") ? modeOverride : VIEW;
+  showToast("⏳ Building PDF…", 60000);
+  try{
+    const blob = await buildPdfBlob((step,total,phase)=>{ showToast(phase==="capturing" ? `⏳ Capturing ${step}/${total}…` : `⏳ Laying out ${step}/${total}…`, 60000); }, mode);
+    showToast("⏳ Sending to Telegram…", 60000);
+    const fd = new FormData();
+    fd.append("chat_id", TG.chat);
+    if(TG.thread) fd.append("message_thread_id", TG.thread);
+    fd.append("caption", "MUPS Watch report — " + new Date().toLocaleString());
+    fd.append("document", new File([blob], pdfFilename(mode), { type:"application/pdf" }));
+    await tgApi("sendDocument", fd);
+    TG.lastError=""; tgSave();
+    showToast("✓ PDF sent to Telegram", 2500);
+  }catch(e){
+    TG.lastError = e.message; tgSave();
+    showToast("Could not send", 1500);
+    showInfoModal("Send to Telegram failed", escH(e.message) + "<br><br>Check the internet connection, the bot token and the chat ID (Test message in the Telegram settings).");
+  }
+}
+
+/* ---- out-of-spec alerts: batched, de-duplicated ---- */
+const TG_FIELD = { iv:"Input V", ov:"Output V", cc:"Charge A", rtemp:"Room °C", s1:"Source 1 V", s2:"Source 2 V", fq:"Freq Hz", bv:"Batt VDC", rt:"Runtime" };
+let tgPending = {}, tgTimer = null; const tgSentMap = {};
+function tgAlertRoom(roomKey){
+  if(!TG.alerts || !tgReady()) return;
+  tgPending[roomKey] = true;
+  clearTimeout(tgTimer); tgTimer = setTimeout(tgAlertFlush, 6000);
+}
+function tgAlertFlush(){
+  const keys = Object.keys(tgPending); tgPending = {};
+  const lines = [], now = Date.now();
+  keys.forEach(rk=>{
+    const room = STATE[rk], panel = document.getElementById("panel-"+rk);
+    if(!room || !panel) return;
+    const items = [];
+    panel.querySelectorAll(".cell-input.alarm").forEach(el=>{
+      const path = el.getAttribute("data-path") || "", p = path.split("."), v = el.value;
+      if(v==="" || p.length<4) return;
+      const sig = path+"="+v; if(tgSentMap[sig] && now-tgSentMap[sig] < 1800000) return;
+      tgSentMap[sig] = now;
+      const unit = (room[p[1]] && room[p[1]][+p[2]]) ? (room[p[1]][+p[2]].n || ("#"+(+p[2]+1))) : p[1];
+      const ph = (p[4]!==undefined && /^\d+$/.test(p[4])) ? " L"+(+p[4]+1) : "";
+      items.push("• "+unit+" — "+(TG_FIELD[p[3]]||p[3])+ph+" = "+v);
+    });
+    if(items.length) lines.push(room.label+" ("+(room.location||"")+")\n"+items.join("\n"));
+  });
+  if(!lines.length) return;
+  const text = "⚠️ MUPS Watch — out of spec\n" + new Date().toLocaleString() + "\n\n" + lines.join("\n\n");
+  tgSendText(text, true).catch(()=>{});
+}
+
+function openTelegramSettings(){
+  const fld = (id,label,type,ph,val,extra)=>`<div class="field-group"><label for="tg_${id}">${label}</label><input class="cell-input" style="width:100%;text-align:left" id="tg_${id}" type="${type}" placeholder="${ph}" value="${escH(val)}" ${extra||""}></div>`;
+  const body = `${fld("token","Bot token","password","123456:ABC…",TG.token,'autocomplete="off"')}
+    ${fld("chat","Chat ID (group IDs start with −100)","text","-1001234567890",TG.chat,'autocomplete="off" inputmode="numeric"')}
+    ${fld("thread","Topic ID (optional, for groups with topics)","text","leave empty",TG.thread,'autocomplete="off"')}
+    <div class="field-group"><label for="tg_alerts">Out-of-spec alerts</label><select class="cell-input" id="tg_alerts" style="width:100%"><option value="0" ${TG.alerts?"":"selected"}>Off</option><option value="1" ${TG.alerts?"selected":""}>On — send a message when a reading goes out of spec</option></select></div>
+    <div class="gh-actions"><button type="button" class="btn ghost" data-tg="test">✉ Test message</button><button type="button" class="btn" data-tg="pdf">📨 Send PDF now</button></div>
+    <div class="gh-note">Keep the alert group private. The token stays on this device only and is not part of any backup. Anyone with the token controls the bot — if it leaks, use /revoke in BotFather. Alerts that fail offline are kept and sent when the connection returns.${TG.lastError?"<br><b>Last error:</b> "+escH(TG.lastError):""}</div>`;
+  const { backdrop } = showFormModal("📨 Telegram bot", "Send the monitoring PDF and out-of-spec alerts to a Telegram chat.", body, "Save settings", (bd, closeFn)=>{
+    if(!read(bd)) return; closeFn(); showToast("✓ Telegram settings saved", 1500);
+  });
+  function status(msg,bad){ const el = backdrop.querySelector(".modal-form-status"); if(!el) return; el.style.display=""; el.textContent=msg; el.style.color = bad ? "var(--red)" : "var(--green)"; }
+  function read(bd){
+    const v = id => bd.querySelector("#tg_"+id).value.trim();
+    if((v("token") || v("chat")) && !(/^\d+:[\w-]{20,}$/.test(v("token")) && /^-?\d+$/.test(v("chat")))){ status("Token looks like 123456:ABC… and the chat ID is a number (negative for groups).", true); return false; }
+    TG.token = v("token"); TG.chat = v("chat"); TG.thread = v("thread").replace(/\D/g,""); TG.alerts = v("alerts")==="1"; tgSave(); return true;
+  }
+  backdrop.addEventListener("click", async (e)=>{
+    const b = e.target.closest("[data-tg]"); if(!b) return; const a = b.getAttribute("data-tg");
+    if(!read(backdrop)) return;
+    if(a==="test"){
+      try{ status("Sending…", false); await tgSendText("✅ MUPS Watch test message — "+new Date().toLocaleString(), false); status("✓ Sent. Check the Telegram chat.", false); }
+      catch(err){ status(err.message, true); }
+    } else if(a==="pdf"){ backdrop.remove(); tgSendPdf(); }
+  });
+}
+window.openTelegramSettings = openTelegramSettings;
+
+/* ---- banner: shown only inside Telegram's built-in browser ---- */
+function inTelegramBrowser(){
+  try{
+    const qs = location.search + location.hash;
+    return /Telegram/i.test(navigator.userAgent) || !!window.TelegramWebviewProxy || !!window.TelegramWebview || /tgWebApp|[?&]from=tg\b/.test(qs);
+  }catch(e){ return false; }
+}
+function chromeIntentUrl(){
+  const u = new URL(location.href); u.hash = "";
+  return "intent://"+u.host+u.pathname+u.search+"#Intent;scheme="+u.protocol.replace(":","")+";package=com.android.chrome;S.browser_fallback_url="+encodeURIComponent(u.href)+";end";
+}
+function plainUrl(){ const u = new URL(location.href); u.hash = ""; return u.href; }
+function copyAppLink(){
+  const url = plainUrl();
+  const fb = ()=>showInfoModal("Copy this link", `Long-press to copy, then paste it into Chrome:<br><br><b style="word-break:break-all">${escH(url)}</b>`);
+  if(navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url).then(()=>showToast("✓ Link copied — paste it in Chrome", 2500), fb); else fb();
+}
+function initTelegramBanner(){
+  if(!inTelegramBrowser()) return;
+  try{ if(sessionStorage.getItem("mups_tg_banner_off")==="1") return; }catch(e){}
+  const web = /^https?:$/.test(location.protocol);
+  const bar = document.createElement("div"); bar.className = "tg-banner no-print";
+  bar.innerHTML = `<span>⚠ You're in Telegram's built-in browser. Printing, saving PDFs and GitHub backup may not work here, and data saved here stays here. Open the app in Chrome.</span>
+    ${web ? '<button type="button" class="btn warn" data-tgb="chrome">🌐 Open in Chrome</button>' : ""}
+    ${web ? '<button type="button" class="btn ghost" data-tgb="copy">📋 Copy link</button>' : ""}
+    <button type="button" class="btn ghost" data-tgb="x">✕</button>`;
+  bar.addEventListener("click", (e)=>{
+    const b = e.target.closest("[data-tgb]"); if(!b) return; const a = b.getAttribute("data-tgb");
+    if(a==="chrome"){ if(/Android/i.test(navigator.userAgent)) location.href = chromeIntentUrl(); else window.open(plainUrl(), "_blank"); setTimeout(()=>{ if(!document.hidden) copyAppLink(); }, 1800); }
+    else if(a==="copy") copyAppLink();
+    else { bar.remove(); try{ sessionStorage.setItem("mups_tg_banner_off","1"); }catch(e){} }
+  });
+  document.body.insertBefore(bar, document.body.firstChild);
+}
+initTelegramBanner();
+setTimeout(tgFlushQueue, 4000);
 
 /* =========================================================
    LINKS & APP DOWNLOAD (V11_21)
