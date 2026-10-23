@@ -6,7 +6,6 @@
 // Set the theme before first paint, straight from localStorage, so the
 // page never flashes the default dark theme before switching to a
 // saved light/system preference.
-  //Valiente.Nuyda APSI 3039
 (function(){
   try{
     var t = window.localStorage.getItem("ups_monitor_theme_v1") || "dark";
@@ -1039,6 +1038,8 @@
   .mm-head .mm-side.on{ background:var(--amber); color:#1a1204; border-color:var(--amber); }
   .mm-node.small text{ fill:var(--amber); font-size:9px; }
   .mm-node.small rect.box{ fill:var(--panel-2); }
+  .mm-link.flow{ opacity:.9; stroke-width:2.2; stroke-dasharray:7 9; animation:mmflow .9s linear infinite; }
+  @media (prefers-reduced-motion:reduce){ .mm-link.flow{ animation:none; } }
 </style>
 </head>
 <body>
@@ -6404,6 +6405,10 @@ const CRAC=[
   {id:"B CRAC-A2",side:"B",name:"CRAC PANEL A",tag:"SECURITY DC 2",site:"Security Data Center 2",dp:"DP-2F-GB-MC-02-PACU-01",lvsb:"LVSB-5B",c:"#9AA5B1"},
   {id:"B CRAC-B2",side:"B",name:"CRAC PANEL B",tag:"SECURITY DC 2",site:"Security Data Center 2",dp:"DP-2F-GA-02-PACU-01",lvsb:"LVSB-12B",c:"#FF8A1F"}
 ];
+/* Data-center rooms that sit between the UPS panels and the CRAC panels on the drawings */
+const GROUPS=[];
+CRAC.forEach(c=>{ if(!GROUPS.some(g=>g.id===c.site&&g.side===c.side)) GROUPS.push({id:c.site,side:c.side,name:c.site.toUpperCase()}); });
+const groupOf=c=>GROUPS.find(g=>g.id===c.site&&g.side===c.side);
 const INP={};
 const setInp=(ids,src,mts)=>ids.forEach(i=>{ INP[i]={src:src,mts:!!mts}; });
 const UA_=n=>"MUPS-"+n+"A", UB_=n=>"MUPS-"+n+"B";
@@ -6461,8 +6466,10 @@ function layout(){
     POS["L:"+l.id]={x:LVX,y:ys.reduce((a,b)=>a+b,0)/Math.max(1,ys.length),w:LVW,h:LVH}; });
   SS.forEach((s,i)=>{ POS["S:"+s.id]={x:SX,y:stsY(i),w:SW,h:SH}; });
   SD.forEach((d,j)=>{ POS["D:"+d.id]={x:SX,y:dcY(j),w:SW,h:SH}; });
-  const SC=bySide(CRAC); cracY0=dcY(SD.length-1)+64;
+  const SC=bySide(CRAC); cracY0=Math.max(dcY(SD.length-1)+64, mdpY(SM.length-1)+MH/2+44);
   SC.forEach((c,j)=>{ POS["C:"+c.id]={x:SX,y:cracY0+j*34,w:SW,h:SH}; });
+  bySide(GROUPS).forEach(g=>{ const ys=SC.filter(c=>c.site===g.id).map(c=>POS["C:"+c.id].y);
+    POS["G:"+g.id]={x:540,y:ys.reduce((a,b)=>a+b,0)/ys.length,w:170,h:30}; });
   SL.filter(l=>l.crac).forEach(l=>{ const ys=SC.filter(c=>c.lvsb===l.id).map(c=>POS["C:"+c.id].y);
     if(ys.length) POS["L:"+l.id]={x:LX+30,y:ys.reduce((a,b)=>a+b,0)/ys.length,w:LVW,h:30}; });
   H=Math.max(cracY0+(SC.length-1)*34+50, mdpY(SM.length-1)+MH/2+60);
@@ -6483,6 +6490,8 @@ function buildLinks(){
     }); });
   bySide(CRAC).forEach(c=>{ const lp=POS["L:"+c.lvsb], cp=POS["C:"+c.id]; if(lp&&cp)
     L.push({k:"c2",crac:c.id,lvsb:c.lvsb,c:c.c,x1:lp.x,y1:lp.y,x2:cp.x+cp.w,y2:cp.y}); });
+  bySide(CRAC).forEach(c=>{ const g=groupOf(c), gp=POS["G:"+g.id], cp=POS["C:"+c.id];
+    L.push({k:"g2c",crac:c.id,group:g.id,c:c.c,x1:gp.x+gp.w,y1:gp.y,x2:cp.x,y2:cp.y}); });
   bySide(UPS).forEach(u=>{ const inp=INP[u.id]; if(inp&&inp.mts){ const tp=POS["T:"+u.id], up=POS["U:"+u.id];
     L.push({k:"t2u",ups:u.id,lvsb:inp.src[0],c:lvById(inp.src[0]).c,x1:tp.x+tp.w,y1:tp.y,x2:up.x,y2:up.y}); } });
   // UPS -> MDP
@@ -6574,10 +6583,14 @@ function trace(){
   };
   const ctxOther=()=>L.forEach((l,i)=>{ if(l.k==="m2s"&&nodes.has("S:"+l.sts)&&!on.has(i)) ctx.add(i); });
   if(sel.t==="U"||sel.t==="M"){ addMdp(sel.t==="U"?upsMdp(sel.id):sel.id); ctxOther(); }
-  else if(sel.t==="C"){ const c=CRAC.find(z=>z.id===sel.id); nodes.add("C:"+c.id); nodes.add("L:"+c.lvsb);
-    L.forEach((l,i)=>{ if(l.k==="c2"&&l.crac===c.id) on.add(i); }); }
+  else if(sel.t==="C"){ const c=CRAC.find(z=>z.id===sel.id); nodes.add("C:"+c.id); nodes.add("L:"+c.lvsb); nodes.add("G:"+groupOf(c).id);
+    L.forEach((l,i)=>{ if((l.k==="c2"||l.k==="g2c")&&l.crac===c.id) on.add(i); }); }
+  else if(sel.t==="G"){ nodes.add("G:"+sel.id);
+    DC.filter(d=>d.site===sel.id).forEach(d=>nodes.add("D:"+d.id));
+    CRAC.filter(c=>c.site===sel.id).forEach(c=>{ nodes.add("C:"+c.id); nodes.add("L:"+c.lvsb);
+      L.forEach((l,i)=>{ if((l.k==="c2"||l.k==="g2c")&&l.crac===c.id) on.add(i); }); }); }
   else if(sel.t==="L"){ nodes.add("L:"+sel.id);
-    bySide(CRAC).filter(c=>c.lvsb===sel.id).forEach(c=>{ nodes.add("C:"+c.id); L.forEach((l,i)=>{ if(l.k==="c2"&&l.crac===c.id) on.add(i); }); });
+    bySide(CRAC).filter(c=>c.lvsb===sel.id).forEach(c=>{ nodes.add("C:"+c.id); nodes.add("G:"+groupOf(c).id); L.forEach((l,i)=>{ if((l.k==="c2"||l.k==="g2c")&&l.crac===c.id) on.add(i); }); });
     const mids=new Set(); bySide(UPS).forEach(u=>{ if(INP[u.id]&&INP[u.id].src.includes(sel.id)) mids.add(upsMdp(u.id)); });
     mids.forEach(addMdp); ctxOther(); }
   else if(sel.t==="S"){
@@ -6589,7 +6602,7 @@ function trace(){
       if(l.k==="u2m"&&(l.mdp===x.s1||l.mdp===x.s2)) on.add(i);
     });
   } else if(sel.t==="D"){
-    const d=DC.find(z=>z.id===sel.id); nodes.add("D:"+d.id); nodes.add("M:"+d.mdp);
+    const d=DC.find(z=>z.id===sel.id); nodes.add("D:"+d.id); nodes.add("M:"+d.mdp); if(POS["G:"+d.site]) nodes.add("G:"+d.site);
     upsOfMdp(d.mdp).forEach(addInput);
     L.forEach((l,i)=>{ if((l.k==="m2d"&&l.dc===d.id)||(l.k==="u2m"&&l.mdp===d.mdp)) on.add(i); });
   }
@@ -6624,10 +6637,10 @@ function draw(){
   let g="", dots="", tags="";
   LINKS.forEach((l,i)=>{
     const isOn=T.on.has(i), isCtx=T.ctx.has(i);
-    const cls="mm-link"+(isOn?" on":isCtx?" ctx":has?" off":"")+(l.draft?" draft":"");
+    const cls="mm-link"+(isOn?" on":isCtx?" ctx":has?" off":"")+((l.k==="c2"||l.k==="g2c")&&!has?" flow":"")+(l.draft?" draft":"");
     const d=pathD(l);
     g+='<path class="'+cls+'" d="'+d+'" stroke="'+l.c+'"/>';
-    if(isOn){
+    if(isOn||((l.k==="c2"||l.k==="g2c")&&!has)){
       dots+='<circle class="mm-dot" r="3.6" fill="'+l.c+'" style="color:'+l.c+'"><animateMotion dur="'+(l.k==="u2m"?"1.4":l.k==="m2s"||l.k==="m2d"?"1.9":"1.0")+'s" repeatCount="indefinite" path="'+d+'"/></circle>';
       if(l.k==="m2s") tags+='<text class="mm-tag" x="'+(l.x2-17)+'" y="'+(l.y2+3)+'">'+l.src+'</text>';
     }
@@ -6637,8 +6650,9 @@ function draw(){
   // nodes
   const cl=(key)=>{ const isSel=sel&&((sel.t+":"+sel.id)===key); return isSel?"sel on":T.nodes.has(key)?"on":has?"dim":""; };
   bySide(LVSB).forEach(l=>{ if(POS["L:"+l.id]) s+=nodeSvg("L:"+l.id,cl("L:"+l.id),[l.id,l.loc]); });
+  bySide(GROUPS).forEach(g=>{ s+=nodeSvg("G:"+g.id,cl("G:"+g.id),[g.name,"DATA CENTER"]); });
   bySide(CRAC).forEach(c=>{ s+=nodeSvg("C:"+c.id,cl("C:"+c.id),[c.name,c.tag]); });
-  s+='<text class="mm-colhead" x="'+SX+'" y="'+(cracY0-26)+'">CRAC (AIR-CON)</text><text class="mm-colhead" x="'+(LX+30)+'" y="'+(cracY0-26)+'">LVSB (CRAC)</text>';
+  s+='<text class="mm-colhead" x="540" y="'+(cracY0-26)+'">DATA CENTER</text><text class="mm-colhead" x="'+SX+'" y="'+(cracY0-26)+'">CRAC (AIR-CON)</text><text class="mm-colhead" x="'+(LX+30)+'" y="'+(cracY0-26)+'">LVSB (CRAC)</text>';
   bySide(UPS).forEach(u=>{ const inp=INP[u.id]; if(!inp) return;
     inp.src.forEach((lid,j)=>{ s+=smallNode("P:"+u.id+":"+j,"PIU",cl("P:"+u.id+":"+j),T); });
     if(inp.mts) s+=smallNode("T:"+u.id,"MTS",cl("T:"+u.id),T); });
@@ -6709,9 +6723,20 @@ function drawCard(){
       h+='<div class="mm-row"><b>Then STS</b>'+(sts.length?sts.map(i=>chip("S",i)).join(""):"—")+'</div>';
     }
     if(cr.length) h+='<div class="mm-row"><b>Feeds CRAC</b>'+cr.map(c=>chip("C",c.id,c.name+" ("+c.tag+")")).join("")+'</div>';
+  } else if(sel.t==="G"){
+    const g=GROUPS.find(z=>z.id===sel.id), cr=CRAC.filter(c=>c.site===g.id), dcs=DC.filter(d=>d.site===g.id);
+    const lvs=[...new Set(cr.map(c=>c.lvsb))];
+    h+='<h3>'+esc(g.name)+'</h3><div class="sub">Data-center room · UPS-backed panels and CRAC (air-con) panels</div>';
+    h+='<div class="mm-row"><b>UPS panels</b>'+dcs.map(d=>chip("D",d.id,d.name)).join("")+'</div>';
+    h+='<div class="mm-row"><b>CRAC panels</b>'+cr.map(c=>chip("C",c.id,c.name)).join("")+'</div>';
+    h+='<div class="mm-row"><b>CRAC fed from</b>'+lvs.map(l=>chip("L",l,l+" ("+lvById(l).loc+")")).join("")+'</div>';
   } else if(sel.t==="C"){
     const c=CRAC.find(z=>z.id===sel.id), lv=lvById(c.lvsb);
     h+='<h3>'+esc(c.name)+'</h3><div class="sub">'+esc(c.site)+' · air-conditioning normal power supply</div>';
+    h+='<div class="mm-row"><b>Serves</b>'+chip("G",groupOf(c).id,groupOf(c).name)+'</div>';
+    if(false){
+    h+='<h3>'+esc(c.name)+'</h3><div class="sub">'+esc(c.site)+' · air-conditioning normal power supply</div>';
+    }
     h+='<div class="mm-row"><b>Fed from</b>'+chip("L",lv.id,lv.id+" ("+lv.loc+")")+'</div>';
     h+='<div class="mm-row"><b>Source DP</b><span>'+(c.dp?esc(c.dp):'not labelled on the drawing')+'</span></div>';
   } else if(sel.t==="M"){
@@ -6779,6 +6804,7 @@ function build(){
     +'<optgroup label="UPS">'+UPS.map(u=>'<option value="U:'+u.id+'">'+u.id+'</option>').join("")+'</optgroup>'
     +'<optgroup label="MDP">'+MDP.map(m=>'<option value="M:'+m.id+'">'+m.pre+' '+m.n+'</option>').join("")+'</optgroup>'
     +'<optgroup label="STS">'+STS.map(s=>'<option value="S:'+s.id+'">'+s.id+'</option>').join("")+'</optgroup>'
+    +'<optgroup label="Data centers">'+GROUPS.map(g=>'<option value="G:'+g.id+'">'+g.side+' · '+g.name+'</option>').join("")+'</optgroup>'
     +'<optgroup label="CRAC panels">'+CRAC.map(c=>'<option value="C:'+c.id+'">'+c.side+' · '+c.name+' ('+c.tag+')</option>').join("")+'</optgroup>'
     +'<optgroup label="Data center / access">'+DC.map(d=>'<option value="D:'+d.id+'">'+d.side+' · '+d.name+'</option>').join("")+'</optgroup>';
   o.innerHTML='<div class="mm-head"><h2><span style="color:var(--amber)">⚡</span> Power-Path Mimic</h2>'
@@ -6818,7 +6844,7 @@ function build(){
 function pick(key){
   let t=key.charAt(0), id=key.slice(2);
   if(t==="P"||t==="T"){ t="U"; id=id.split(":")[0]; key="U:"+id; }
-  const item=(t==="U"?UPS:t==="M"?MDP:t==="S"?STS:t==="L"?LVSB:t==="C"?CRAC:DC).find(x=>x.id===id);
+  const item=(t==="U"?UPS:t==="M"?MDP:t==="S"?STS:t==="L"?LVSB:t==="C"?CRAC:t==="G"?GROUPS:DC).find(x=>x.id===id);
   if(item&&item.side!==side&&!(item.also&&item.also.indexOf(side)>-1)) side=item.side;
   sel={t,id}; editing=false;
   const j=document.getElementById("mmJump"); if(j) j.value=key;
