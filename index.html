@@ -969,6 +969,75 @@
 
   html.printing .cell{ border-color:var(--border-soft); }
   html.printing .ring, html.printing .ups-grid, html.printing .fleet-strip{ display:none; }
+
+  /* ================= MIMIC (power-path tracer) ================= */
+  .mimicbtn{
+    display:inline-flex; align-items:center; justify-content:center;
+    width:16px; height:16px; border-radius:4px; margin-left:4px;
+    background:rgba(90,169,230,.15); color:var(--blue); border:none; cursor:pointer;
+    font-size:10px; line-height:1; vertical-align:middle; padding:0;
+  }
+  .mimicbtn:hover{ background:var(--blue); color:#06141f; }
+  #mimicOverlay{ position:fixed; inset:0; z-index:150; background:var(--bg); display:none; flex-direction:column; color:var(--text); font-family:var(--font-body); }
+  #mimicOverlay.open{ display:flex; }
+  .mm-head{ display:flex; flex-wrap:wrap; gap:8px; align-items:center; padding:10px 12px; border-bottom:1px solid var(--border); background:var(--panel); }
+  .mm-head h2{ margin:0 auto 0 0; font-family:var(--font-display); font-size:15px; display:flex; align-items:center; gap:8px; }
+  .mm-head select{ background:var(--panel-2); color:var(--text); border:1px solid var(--border); border-radius:8px; padding:7px 8px; font-family:var(--font-mono); font-size:12px; max-width:46vw; }
+  .mm-head .btn{ padding:7px 10px; }
+  .mm-wrap{ flex:1; overflow:auto; background:radial-gradient(800px 400px at 20% 0%, #101c26 0%, transparent 60%), var(--bg); touch-action:pan-x pan-y pinch-zoom; }
+  svg#mmSvg{ display:block; height:auto; margin:0 auto; }
+  .mm-colhead{ fill:var(--text-faint); font-family:var(--font-mono); font-size:11px; letter-spacing:1.4px; }
+  .mm-link{ fill:none; stroke-width:1.4; opacity:.30; transition:opacity .2s; }
+  .mm-link.off{ opacity:.07; }
+  .mm-link.ctx{ opacity:.6; stroke-width:1.6; stroke-dasharray:2 4; }
+  .mm-link.on{ opacity:1; stroke-width:2.8; stroke-dasharray:7 9; animation:mmflow .8s linear infinite; }
+  .mm-link.draft{ stroke-dasharray:3 5; }
+  .mm-link.on.draft{ stroke-dasharray:7 9; }
+  @keyframes mmflow{ to{ stroke-dashoffset:-16; } }
+  .mm-dot{ filter:drop-shadow(0 0 4px currentColor); }
+  .mm-node{ cursor:pointer; }
+  .mm-node rect.box{ fill:var(--panel); stroke:var(--border); stroke-width:1.5; transition:opacity .2s; }
+  .mm-node.st-ok rect.box{ stroke:var(--green-dim); }
+  .mm-node.st-alarm rect.box{ stroke:var(--red); fill:rgba(255,93,108,.12); }
+  .mm-node.st-warn rect.box{ stroke:var(--amber); }
+  .mm-node text{ fill:var(--text); font-family:var(--font-mono); font-size:11.5px; pointer-events:none; }
+  .mm-node text.sub{ fill:var(--text-dim); font-size:9.5px; }
+  .mm-node .led{ fill:var(--text-faint); }
+  .mm-node.st-ok .led{ fill:var(--green); }
+  .mm-node.st-alarm .led{ fill:var(--red); }
+  .mm-node.st-warn .led{ fill:var(--amber); }
+  .mm-node.dim{ opacity:.28; }
+  .mm-node.on rect.box{ stroke-width:2.4; stroke:var(--text); }
+  .mm-node.sel rect.box{ stroke:var(--amber); stroke-width:3.2; animation:mmpulse 1.3s ease-in-out infinite; }
+  @keyframes mmpulse{ 0%,100%{ stroke-opacity:1; } 50%{ stroke-opacity:.35; } }
+  .mm-load{ fill:var(--text-dim); font-family:var(--font-mono); font-size:10.5px; }
+  .mm-tag{ fill:var(--amber); font-family:var(--font-mono); font-size:9.5px; font-weight:700; }
+  .mm-card{ border-top:1px solid var(--border); background:var(--panel); padding:12px 14px calc(14px + env(safe-area-inset-bottom,0px)); max-height:44vh; overflow-y:auto; font-size:12.5px; line-height:1.55; }
+  .mm-card h3{ margin:0 0 4px; font-family:var(--font-display); font-size:15px; display:flex; flex-wrap:wrap; align-items:center; gap:8px; }
+  .mm-card .sub{ color:var(--text-dim); font-family:var(--font-mono); font-size:11px; margin-bottom:8px; }
+  .mm-row{ display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin:6px 0; }
+  .mm-row b{ font-family:var(--font-mono); font-size:10px; letter-spacing:1.2px; color:var(--text-faint); text-transform:uppercase; min-width:86px; }
+  .mm-chip{ font-family:var(--font-mono); font-size:11.5px; color:var(--text); background:var(--panel-3); border:1px solid var(--border); border-radius:999px; padding:3px 10px; cursor:pointer; }
+  .mm-chip:hover{ border-color:var(--amber); }
+  .mm-chip.s2{ border-style:dashed; }
+  .mm-pill{ font-family:var(--font-mono); font-size:10.5px; font-weight:700; padding:2px 9px; border-radius:999px; border:1px solid var(--border); color:var(--text-dim); }
+  .mm-pill.ok{ color:var(--green); border-color:var(--green-dim); }
+  .mm-pill.alarm{ color:var(--red); border-color:var(--red-dim); background:rgba(255,93,108,.1); }
+  .mm-pill.warn{ color:var(--amber); border-color:var(--amber-dim); }
+  .mm-pill.draft{ color:var(--amber); border-color:var(--amber-dim); }
+  .mm-kv{ display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:6px; margin:8px 0; }
+  .mm-kv div{ background:var(--panel-2); border:1px solid var(--border-soft); border-radius:8px; padding:5px 8px; font-family:var(--font-mono); font-size:12px; }
+  .mm-kv div span{ display:block; font-size:9px; color:var(--text-faint); letter-spacing:1.2px; text-transform:uppercase; }
+  .mm-kv div.bad{ border-color:var(--red); color:var(--red); }
+  .mm-edit{ display:none; margin-top:8px; padding:8px; border:1px dashed var(--border); border-radius:8px; }
+  .mm-edit.open{ display:block; }
+  .mm-edit select{ background:var(--panel-2); color:var(--text); border:1px solid var(--border); border-radius:6px; padding:5px; font-family:var(--font-mono); font-size:12px; }
+  .mm-legend{ display:flex; flex-wrap:wrap; gap:12px; font-family:var(--font-mono); font-size:10.5px; color:var(--text-dim); margin-top:8px; }
+  .mm-legend i{ display:inline-block; width:18px; height:0; border-top:3px solid var(--text-dim); vertical-align:middle; margin-right:5px; }
+  @media (prefers-reduced-motion:reduce){ .mm-link.on, .mm-node.sel rect.box{ animation:none; } .mm-dot{ display:none; } }
+  .mm-head .mm-side.on{ background:var(--amber); color:#1a1204; border-color:var(--amber); }
+  .mm-node.small text{ fill:var(--amber); font-size:9px; }
+  .mm-node.small rect.box{ fill:var(--panel-2); }
 </style>
 </head>
 <body>
@@ -994,6 +1063,7 @@
       <button id="zoomIn" title="Zoom in">+</button>
     </div>
     <button class="btn warn" id="btnLoad" data-view-only="log">⭯ Load Sample Data</button>
+    <button class="btn ghost" id="btnMimic" title="Trace UPS → MDP → STS connections">⚡ Mimic</button>
     <button class="btn ghost" id="btnMoreTools" title="More tools">⋯ More</button>
     <button class="btn primary" id="btnPrint">🖨 Export / Print PDF</button>
   </div>
@@ -1692,16 +1762,16 @@ const DEFAULT_TECH_ROSTER = ["V.NUYDA","J.CAGAS","K.JACOB","E.DACUNO"];
 function defaultData(){
   return {
     r1:{
-      label:"Room 1", tag:"MUPS-19A · 20A · 23A · 24A",
+      label:"Room 1", tag:"MUPS-13A · 14A · 15A · 16A",
       location:"MUPS ROOM-1",
       dutyEngineers:"V.NUYDA / J.CAGAS / K.JACOB / E.DACUNO",
       date:"", time:"20:00",
       checkTime1:"01:00", checkTime2:"04:00",
       ups:[
-        ups("MUPS-19A","300kVA",[400.2,402.2,394.6],[400,399.7,400],97.7,193.9,[33.9,0,0,34.2,33.8],521.9,27,0,20.3, insp("NORMAL",18.4,"NORMAL","NORMAL",18.4,"NORMAL")),
-        ups("MUPS-20A","300kVA",[400.8,402.3,395.6],[400.9,399,400.2],97.9,null,[0,0,34.3,34.3,34],522.7,27.1,0,19.5, insp("NORMAL",19.4,"NORMAL","NORMAL",18.4,"NORMAL")),
-        ups("MUPS-23A","300kVA",[405,405.8,399.2],[399.9,400,399.9],57.9,146.3,[0,31.4,31.4,0,0],521.6,66.3,0,24.3, insp("NORMAL",20.8,"NORMAL","NORMAL",22.3,"NORMAL")),
-        ups("MUPS-24A","300kVA",[403.6,404.8,398.4],[400.2,399.5,399.6],88.7,null,[31.2,31.2,31.1,0,0],526.7,39.6,0,24.3, insp("NORMAL",22.8,"NORMAL","NORMAL",22.4,"NORMAL"))
+        ups("MUPS-13A","300kVA",[400.2,402.2,394.6],[400,399.7,400],97.7,193.9,[33.9,0,0,34.2,33.8],521.9,27,0,20.3, insp("NORMAL",18.4,"NORMAL","NORMAL",18.4,"NORMAL")),
+        ups("MUPS-14A","300kVA",[400.8,402.3,395.6],[400.9,399,400.2],97.9,null,[0,0,34.3,34.3,34],522.7,27.1,0,19.5, insp("NORMAL",19.4,"NORMAL","NORMAL",18.4,"NORMAL")),
+        ups("MUPS-15A","300kVA",[405,405.8,399.2],[399.9,400,399.9],57.9,146.3,[0,31.4,31.4,0,0],521.6,66.3,0,24.3, insp("NORMAL",20.8,"NORMAL","NORMAL",22.3,"NORMAL")),
+        ups("MUPS-16A","300kVA",[403.6,404.8,398.4],[400.2,399.5,399.6],88.7,null,[31.2,31.2,31.1,0,0],526.7,39.6,0,24.3, insp("NORMAL",22.8,"NORMAL","NORMAL",22.4,"NORMAL"))
       ],
       sts:[
         sts("STS-21A","400A",[232,232,232],[234,232,232],[39,45,35],[152,184,144],30,[60,60],"21:05", insp("NORMAL",30,"NORMAL","NORMAL",30,"NORMAL")),
@@ -2034,6 +2104,7 @@ async function loadState(){
       if(!STATE.meta) STATE.meta = { nextRoomNum: computeNextRoomNum() };
       if(!STATE.techRoster || !STATE.techRoster.length) STATE.techRoster = DEFAULT_TECH_ROSTER.slice();
       ensureBatteryBanksOnState();
+      if(window.__migrateRenames && window.__migrateRenames()) setTimeout(function(){ scheduleSave(); },0);   // V11_23
       if(!ACTIVE || !STATE[ACTIVE]) ACTIVE = ROOM_ORDER[0];
       document.getElementById("saveBadge").textContent = "loaded saved entries";
       return;
@@ -2107,7 +2178,7 @@ function renderUpsTable(roomKey, room){
           ${txt(base+'.n', u.n, 'eqname-input','Unit ID')}
           <button class="rowdel no-print" title="Remove this UPS row" onclick="removeUpsRow('${roomKey}',${i})">×</button>
         </div>
-        <div class="eq-sub"><input class="cap-input" type="text" data-path="${base}.c" data-kind="text" value="${u.c||''}" placeholder="capacity"><button class="assetbtn no-print ${hasAsset(u.n)?'has':''}" data-rk="${roomKey}" data-sec="ups" data-i="${i}" title="Unit details: serial no., gateway IP, install date, manual &amp; links" aria-label="Unit details" onclick="openAssetFromLog('${roomKey}','ups',${i})">ℹ</button></div>
+        <div class="eq-sub"><input class="cap-input" type="text" data-path="${base}.c" data-kind="text" value="${u.c||''}" placeholder="capacity"><button class="assetbtn no-print ${hasAsset(u.n)?'has':''}" data-rk="${roomKey}" data-sec="ups" data-i="${i}" title="Unit details: serial no., gateway IP, install date, manual &amp; links" aria-label="Unit details" onclick="openAssetFromLog('${roomKey}','ups',${i})">ℹ</button><button class="mimicbtn no-print" title="Trace power path (UPS → MDP → STS)" aria-label="Trace power path" onclick="MIMIC.open('${u.n}')">⛓</button></div>
       </td>
       <td>${num(base+'.iv.0',u.iv[0],{spec:'upsV',effSpec:effSpec})}</td>
       <td>${num(base+'.iv.1',u.iv[1],{spec:'upsV',effSpec:effSpec})}</td>
@@ -2172,7 +2243,7 @@ function renderStsTable(roomKey, room){
           ${txt(base+'.n', s.n, 'eqname-input','Unit ID')}
           <button class="rowdel no-print" title="Remove this STS row" onclick="removeStsRow('${roomKey}',${i})">×</button>
         </div>
-        <div class="eq-sub"><input class="cap-input" type="text" data-path="${base}.c" data-kind="text" value="${s.c||''}" placeholder="capacity"><button class="assetbtn no-print ${hasAsset(s.n)?'has':''}" data-rk="${roomKey}" data-sec="sts" data-i="${i}" title="Unit details: serial no., gateway IP, install date, manual &amp; links" aria-label="Unit details" onclick="openAssetFromLog('${roomKey}','sts',${i})">ℹ</button></div>
+        <div class="eq-sub"><input class="cap-input" type="text" data-path="${base}.c" data-kind="text" value="${s.c||''}" placeholder="capacity"><button class="assetbtn no-print ${hasAsset(s.n)?'has':''}" data-rk="${roomKey}" data-sec="sts" data-i="${i}" title="Unit details: serial no., gateway IP, install date, manual &amp; links" aria-label="Unit details" onclick="openAssetFromLog('${roomKey}','sts',${i})">ℹ</button><button class="mimicbtn no-print" title="Trace power path (UPS → MDP → STS)" aria-label="Trace power path" onclick="MIMIC.open('${s.n}')">⛓</button></div>
       </td>
       <td>${num(base+'.s1.0',s.s1[0],{spec:'stsSrc',effSpec:effSpec})}</td>
       <td>${num(base+'.s1.1',s.s1[1],{spec:'stsSrc',effSpec:effSpec})}</td>
@@ -3424,6 +3495,9 @@ document.addEventListener("click", (e)=>{
 });
 
 // exposed for inline onclick handlers rendered via innerHTML
+window.__getState = function(){ return STATE; };
+window.__alarmClass = alarmClass;
+window.__effSpec = getEffectiveSpec;
 window.addUpsRow = addUpsRow;
 window.removeUpsRow = removeUpsRow;
 window.addStsRow = addStsRow;
@@ -3683,6 +3757,7 @@ async function loadFromPresetSlot(idx){
   if(!STATE.meta) STATE.meta = { nextRoomNum: computeNextRoomNum() };
   if(!STATE.techRoster || !STATE.techRoster.length) STATE.techRoster = DEFAULT_TECH_ROSTER.slice();
   ensureBatteryBanksOnState();
+  if(window.__migrateRenames) window.__migrateRenames();   // V11_23
   if(!ROOM_ORDER.includes(ACTIVE)) ACTIVE = ROOM_ORDER[0];
   logAudit(null, `Loaded default slot ${idx+1} ("${slot.name}") — replaced all room data.`);
   renderAll();
@@ -3819,7 +3894,7 @@ const DEFAULT_CELLS_PER_BANK = 40; // batteries in series per bank, for new unit
 const LONG_PRESS_MS = 480;
 
 const DEFAULT_BATTERY_UNITS = [
-  ["MUPS-19A","MUPS ROOM-1"],["MUPS-20A","MUPS ROOM-1"],["MUPS-23A","MUPS ROOM-1"],["MUPS-24A","MUPS ROOM-1"],
+  ["MUPS-13A","MUPS ROOM-1"],["MUPS-14A","MUPS ROOM-1"],["MUPS-15A","MUPS ROOM-1"],["MUPS-16A","MUPS ROOM-1"],
   ["MUPS-1A","MUPS ROOM-2 & 3"],["MUPS-2A","MUPS ROOM-2 & 3"],["MUPS-4A","MUPS ROOM-2 & 3"],["MUPS-5A","MUPS ROOM-2 & 3"],
   ["MUPS-1B","MUPS ROOM-4"],["MUPS-2B","MUPS ROOM-4"],["MUPS-3B","MUPS ROOM-4"],["MUPS-4B","MUPS ROOM-4"],
   ["MUPS-5B","MUPS ROOM-4"],["MUPS-6B","MUPS ROOM-4"],["MUPS-10B","MUPS ROOM-4"],["MUPS-11B","MUPS ROOM-4"],
@@ -4626,7 +4701,8 @@ function buildBackupObject(){
     kind: "mups-watch-backup", version: 1, exportedAt: new Date().toISOString(),
     roomOrder: ROOM_ORDER.slice(), state: deepClone(STATE),
     assets: deepClone(ASSETS),                      // V11_14: unit details (older backups simply don't have this key)
-    links: deepClone(LINKS)                         // V11_21: saved links + app download link
+    links: deepClone(LINKS),                        // V11_21: saved links + app download link
+    mimic: (window.MIMIC&&window.MIMIC.exportOv) ? window.MIMIC.exportOv() : undefined   // V11_23: edited mimic connections
   };                                               // note: the GitHub token / OCR key live in their own keys and are never included
 }
 function exportBackup(){
@@ -4653,6 +4729,8 @@ function confirmAndApplyBackup(backup, sourceLabel, onApplied){
       if(!STATE.techRoster || !STATE.techRoster.length) STATE.techRoster = DEFAULT_TECH_ROSTER.slice();
       ensureBatteryBanksOnState();
       if(backup.assets && typeof backup.assets==="object"){ Object.assign(ASSETS, backup.assets); saveAssets(); }   // merge, never wipe existing details
+      if(window.MIMIC&&window.MIMIC.importOv&&backup.mimic) window.MIMIC.importOv(backup.mimic);   // V11_23
+      if(window.__migrateRenames) window.__migrateRenames();                                       // V11_23
       mergeLinks(backup.links);                                                                                        // add links we don't have yet; keep ours
       if(!ROOM_ORDER.includes(ACTIVE)) ACTIVE = ROOM_ORDER[0];
       logAudit(null, `Imported backup${sourceLabel?" ("+sourceLabel+")":""} from ${new Date(backup.exportedAt).toLocaleString()}.`);
@@ -5223,6 +5301,7 @@ document.getElementById("btnMoreTools").addEventListener("click", ()=>{
   const commonTail = [
     { label: "☁ GitHub backup & sync", onClick: ()=>{ openGithubSync(); } },
     { label: "📨 Telegram bot" + (TG.alerts ? " (alerts on)" : ""), onClick: ()=>{ openTelegramSettings(); } },
+    { label: "⚡ Power-path mimic", onClick: ()=>{ MIMIC.open(); } },
     { label: "🗂 UPS & STS unit details", onClick: ()=>{ showAssetRegister(); } },
     { label: "📖 Help & user guide", onClick: ()=>{ showHelpGuide(); } },
     { divider:true },
@@ -5384,6 +5463,31 @@ let ASSETS = (function(){ try{ const r = Store.get(ASSETS_KEY); const o = r && J
 const ASSET_FIELDS = ["brand","model","sn","ip","installed","warranty","manual","site","notes"];
 function assetKey(n){ return String(n||"").trim().toUpperCase(); }
 function saveAssets(){ return !!Store.set(ASSETS_KEY, JSON.stringify(ASSETS)); }
+/* V11_23: unit renames 19A→13A, 20A→14A, 23A→15A, 24A→16A — applied to saved rooms, battery units, unit details and trend history */
+function migrateUnitRenames(){
+  const MAP={"MUPS-19A":"MUPS-13A","MUPS-20A":"MUPS-14A","MUPS-23A":"MUPS-15A","MUPS-24A":"MUPS-16A"};
+  const fix=v=>MAP[String(v||"").trim().toUpperCase()];
+  let n=0; const done=[];
+  try{
+    (STATE.roomOrder||[]).forEach(rk=>{ const room=STATE[rk]; if(!room) return;
+      (room.ups||[]).forEach(u=>{ const t=fix(u.n); if(t){ done.push(u.n+"→"+t); u.n=t; n++; } });
+      if(room.tag==="MUPS-19A · 20A · 23A · 24A") room.tag="MUPS-13A · 14A · 15A · 16A";
+    });
+    const units=(STATE.batteryBanks&&STATE.batteryBanks.units)||[];
+    units.forEach(u=>{ const t=fix(u.id); if(t && !units.some(x=>x.id===t)){ u.id=t; n++; } });
+    let aChanged=false;
+    Object.keys(MAP).forEach(o=>{ if(ASSETS[o]){ if(!ASSETS[MAP[o]]) ASSETS[MAP[o]]=ASSETS[o]; delete ASSETS[o]; aChanged=true; n++; } });
+    if(aChanged) saveAssets();
+    const log=getTrendLog(); let tChanged=false;
+    Object.keys(log).forEach(k=>{ const p=k.split("|"); const t=fix(p[2]); if(t){ p[2]=t; const nk=p.join("|");
+        log[nk]=(log[nk]||[]).concat(log[k]).sort((a,b)=>a.t<b.t?-1:1); delete log[k]; tChanged=true; n++; } });
+    if(tChanged) saveTrendLog(log);
+    if(n && done.length){ try{ logAudit(null, "Unit rename applied: "+done.join(", ")+"."); }catch(e){} }
+  }catch(e){ console.warn("rename migration skipped", e); }
+  return n;
+}
+window.__migrateRenames = migrateUnitRenames;
+
 function getAsset(n){ return ASSETS[assetKey(n)] || null; }
 function hasAsset(n){ const a = getAsset(n); return !!(a && ASSET_FIELDS.some(f=>a[f])); }
 function normUrl(v){ v=(v||"").trim(); if(!v) return ""; return /^[a-z][a-z0-9+.-]*:/i.test(v) ? v : "https://"+v; }
@@ -6187,6 +6291,534 @@ window.openLinksManager = openLinksManager;
 })();
 
 })();
+</script>
+<script>
+/* ===== V11_23: Power-path mimic (Group-A + Group-B) ===== */
+/* =========================================================
+   MIMIC — power-path tracer (UPS → MDP → STS / DC panels)
+   Source: "UPS & STS at Group-A As-Built" drawing, page 03/03.
+   Pure SVG + JS, no libraries, works offline.
+   Reads live log data through window.__getState().
+   ========================================================= */
+(function(){
+"use strict";
+
+/* ---------- topology from the drawings ---------- */
+/* A-side: "UPS & STS at Group-A As-Built" (sheet 03/03)
+   B-side: "UPS & STS System Diagram" Group-B (10.09.25)          */
+const RENAMES={"MUPS-19A":"MUPS-13A","MUPS-20A":"MUPS-14A","MUPS-23A":"MUPS-15A","MUPS-24A":"MUPS-16A"}; // old log names → current
+const MDP = [
+  {id:"M1", side:"A", pre:"MDP-UPS-GA", n:"CASINO-01",    room:"2/3",   c:"#F2A93B"},
+  {id:"M2", side:"A", pre:"MDP-UPS-GA", n:"JC-01",        room:"2/3",   c:"#9B6BFF"},
+  {id:"M3", side:"A", pre:"MDP-UPS-GA", n:"CASINO-02",    room:"1/1.1", c:"#C98BFF"},
+  {id:"M4", side:"A", pre:"MDP-UPS-GA", n:"02-CASINO-01", room:"1/1.1", c:"#FF5D6C"},
+  {id:"M5", side:"A", pre:"MDP-UPS-GA", n:"03-CASINO-01", room:"2/3",   c:"#33D690"},
+  {id:"M6", side:"A", pre:"MDP-UPS-GA", n:"04-CASINO-01", room:"5",     c:"#6FE3A6"},
+  {id:"M7", side:"A", pre:"MDP-UPS-GA", n:"01-DC-01",     room:"1/1.1", c:"#FFC266"},
+  {id:"M8", side:"A", pre:"MDP-UPS-GA", n:"01-DC-02",     room:"1/1.1", c:"#FF8A94"},
+  {id:"B1", side:"B", pre:"MDP-UPS-GB", n:"01-CASINO-01", room:"4", c:"#FF5D6C", lvsb:"LVSB-4B (MEC-B1)",  grp:"Group 1"},
+  {id:"B2", side:"B", pre:"MDP-UPS-GB", n:"03-CASINO-01", room:"4", c:"#4FC3F7", lvsb:"LVSB-13B (MEC-B1)", grp:"Group 2"},
+  {id:"B3", side:"B", pre:"MDP-UPS-GB", n:"02-CASINO-01", room:"4", c:"#9B6BFF", lvsb:"LVSB-20B (MEC-B1)", grp:"Group 3"},
+  {id:"B4", side:"B", pre:"MDP-UPS-GB", n:"01-DC-01",     room:"4", c:"#FF8A94", lvsb:"LVSB-4B (MEC-B1)"},
+  {id:"B5", side:"B", pre:"MDP-UPS-GB", n:"02-DC-01",     room:"4", c:"#7DD3FC", lvsb:"LVSB-13B (MEC-B1)"}
+];
+const UPS = [];
+for(let k=1;k<=16;k++) UPS.push({id:"MUPS-"+k+"A", side:"A", kva:300, mdp:"M"+(Math.floor((k-1)/2)+1)});
+[["1B","B1",300],["2B","B1",300],["3B","B2",300],["4B","B2",300],["5B","B3",300],["6B","B3",300],
+ ["10B","B4",400],["11B","B4",400],["13B","B5",400],["14B","B5",400]]
+ .forEach(r=>UPS.push({id:"MUPS-"+r[0], side:"B", kva:r[2], mdp:r[1]}));
+
+const UA="DP-UPS-UGF-GA-", UB="DP-UPS-UGF-GB-";
+/* id, amps, room, serving-load DP (wired straight to the STS beside it), zone, default Source1 MDP, default Source2 MDP, side */
+const STS_RAW = [
+ ["STS-1A",600,"2/3",UA+"ZONE G-01","ZONE 1","M1","M3","A",1],
+ ["STS-2A",200,"5",UA+"JC 2&7-02","JUNKET 2 & 7","M1","M3","A",1],
+ ["STS-3A",600,"1/1.1",UA+"ZONE G-02","ZONE 1","M1","M4","A",1],
+ ["STS-4A",600,"1/1.1",UA+"ZONE H-01","ZONE J & F","M1","M3","A",1],
+ ["STS-5A",200,"1/1.1",UA+"JC 8&9-02","NEW MAHARLIKA / PERLAS","M3","M1","A",1],
+ ["STS-6A",600,"1/1.1",UA+"ZONE H-02","ZONE J & F","M4","M3","A",1],
+ ["STS-7A",800,"1/1.1",UA+"ZONE E","ZONE F & H","M1","M4","A",1],
+ ["STS-8A",600,"1/1.1",UA+"HL NORTH","ZONE F & H","M3","M4","A",1],
+ ["STS-9A",300,"2/3",UA+"VIP A&B-02","WEST A & B","M5","M2","A",0],
+ ["STS-10A",200,"2/3",UA+"JC 2&7-01","JUNKET 2 & 7","M5","M2","A",0],
+ ["STS-11A",200,"2/3",UA+"JC 8&9-01","NEW MAHARLIKA / PERLAS","M5","M2","A",0],
+ ["STS-12A",200,"2/3",UA+"JC 1&5-01","JUNKET 5","M5","M2","A",0],
+ ["STS-13A",300,"2/3",UA+"JC 3&4-01","JUNKET 3 & 4","M2","M5","A",0],
+ ["STS-14A",300,"2/3",UA+"PREMIUM-01","OKADA CLUB / JUNKET 6","M5","M2","A",0],
+ ["STS-15A",200,"5",UA+"JC 3&4-02","JUNKET 3 & 4","M2","M6","A",0],
+ ["STS-16A",200,"5",UA+"PREMIUM-02","OKADA CLUB","M6","M2","A",0],
+ ["STS-17A",800,"5",UA+"ZONE F-01","ZONE G","M6","M5","A",0],
+ ["STS-18A",800,"2/3",UA+"ZONE F-02","ZONE G","M2","M5","A",0],
+ ["STS-19A",200,"5",UA+"JC 1&5-02","ZONE G","M6","M5","A",0],
+ ["STS-20A",300,"5",UA+"VIP-A&B-01","WEST A & B","M6","M5","A",0],
+ ["STS-21A",400,"1/1.1","DP-UPS-LGF-GA-AR-01","ACCESS ROOM","M7","M8","A",1],
+ ["STS-22A",400,"1/1.1","DP-UPS-LGF-GA-AR-02","ACCESS ROOM","M7","M8","A",1],
+ ["STS-1B",400,"4",UB+"ZONE C-01","ZONE C","B2","B1","B",1],
+ ["STS-2B",400,"4",UB+"VIP EAST-01","MAHARLIKA ON-LINE GAMING","B2","B1","B",1],
+ ["STS-3B",400,"4",UB+"ZONE C-02","ZONE C & D","B2","B3","B",1],
+ ["STS-4B",400,"4",UB+"ZONE D-01","ZONE E & K","B1","B2","B",1],
+ ["STS-5B",400,"4",UB+"ZONE B-01","ZONE B","B1","B2","B",1],
+ ["STS-6B",400,"4",UB+"ZONE A-01","ZONE A & B","B1","B3","B",1],
+ ["STS-7B",400,"4",UB+"HL SOUTH-01","ZONE D","B2","B3","B",1],
+ ["STS-8B",400,"4",UB+"ZONE A-02","ZONE A & B","B3","B1","B",1]
+];
+const STS = STS_RAW.map(r=>({id:r[0],amps:r[1],room:r[2],dp:r[3],zone:r[4],s1:r[5],s2:r[6],side:r[7],vf:!!r[8]}));
+const DC = [
+  {id:"DC PANEL A", side:"A", name:"UPS PANEL A", dp:"DP-UPS-LGF-GA-DC-01",  site:"Main Data Center 1",     mdp:"M7"},
+  {id:"DC PANEL B", side:"A", name:"UPS PANEL B", dp:"DP-UPS-LGF-GA-DC-02",  site:"Main Data Center 1",     mdp:"M8"},
+  {id:"SEC PANEL 1",side:"A", name:"SEC-01",      dp:"DP-UPS-LGF-GA-SEC-01", site:"Security Data Center 1", mdp:"M7"},
+  {id:"SEC PANEL 2",side:"A", name:"SEC-02",      dp:"DP-UPS-LGF-GA-SEC-02", site:"Security Data Center 1", mdp:"M8"},
+  {id:"DC2 PANEL A", side:"B", name:"UPS PANEL A",  dp:"DP-UPS-LGF-GB-DC-01",  site:"Main Data Center 2",     mdp:"B4"},
+  {id:"DC2 PANEL B", side:"B", name:"UPS PANEL B",  dp:"DP-UPS-LGF-GB-DC-02",  site:"Main Data Center 2",     mdp:"B5"},
+  {id:"SEC2 PANEL 1",side:"B", name:"SEC-01",       dp:"DP-UPS-LGF-GB-SEC-01", site:"Security Data Center 2", mdp:"B4"},
+  {id:"SEC2 PANEL 2",side:"B", name:"SEC-02",       dp:"DP-UPS-LGF-GB-SEC-02", site:"Security Data Center 2", mdp:"B5"},
+  {id:"AR2 PANEL 1", side:"B", name:"ACCESS RM-01", dp:"DP-UPS-LGF-GB-AR-01",  site:"Access Room 2",          mdp:"B4"},
+  {id:"AR2 PANEL 2", side:"B", name:"ACCESS RM-02", dp:"DP-UPS-LGF-GB-AR-02",  site:"Access Room 2",          mdp:"B5"}
+];
+
+
+/* Input stage (from the drawings): LVSB → PIU (one per UPS) → UPS.  mts:true = two PIUs feed a manual transfer switch, then the UPS */
+const LVSB=[
+  {id:"LVSB-11A",side:"A",loc:"MEC-A2",c:"#F2A93B",anchor:["MUPS-1A","MUPS-2A"]},
+  {id:"LVSB-2A", side:"A",loc:"MEC-A1",c:"#9B6BFF",anchor:["MUPS-3A","MUPS-4A","MUPS-5A","MUPS-6A"]},
+  {id:"LVSB-4A", side:"A",loc:"MEC-A1",c:"#FF5D6C",anchor:["MUPS-7A","MUPS-8A"]},
+  {id:"LVSB-16A",side:"A",loc:"MEC-A3",c:"#33D690",anchor:["MUPS-9A","MUPS-10A","MUPS-11A","MUPS-12A"]},
+  {id:"LVSB-4B", side:"B",loc:"MEC-B1",c:"#FF5D6C",anchor:["MUPS-1B","MUPS-2B"]},
+  {id:"LVSB-13B",side:"B",loc:"MEC-B1",c:"#4FC3F7",anchor:["MUPS-3B","MUPS-4B"]},
+  {id:"LVSB-20B",side:"B",loc:"MEC-B1",c:"#9B6BFF",anchor:["MUPS-5B","MUPS-6B"]}
+];
+const INP={};
+const setInp=(ids,src,mts)=>ids.forEach(i=>{ INP[i]={src:src,mts:!!mts}; });
+const UA_=n=>"MUPS-"+n+"A", UB_=n=>"MUPS-"+n+"B";
+setInp([1,2,13].map(UA_),["LVSB-11A"]);
+setInp([3,4,5,6].map(UA_),["LVSB-2A"]);
+setInp([7,8,15].map(UA_),["LVSB-4A"]);
+setInp([9,10,11,12].map(UA_),["LVSB-16A"]);
+setInp([14,16].map(UA_),["LVSB-11A","LVSB-4A"],true);
+setInp([1,2,10,11].map(UB_),["LVSB-4B"]);
+setInp([3,4,13].map(UB_),["LVSB-13B"]);
+setInp([5,6].map(UB_),["LVSB-20B"]);
+setInp([14].map(UB_),["LVSB-13B","LVSB-4B"],true);
+const lvById=id=>LVSB.find(l=>l.id===id);
+
+/* ---------- user overrides (in-app editor) ---------- */
+const OV_KEY="mups_topology_v1";
+let ov={ups:{},sts:{}};
+try{ const r=localStorage.getItem(OV_KEY); if(r) ov=Object.assign({ups:{},sts:{}},JSON.parse(r)); }catch(e){}
+function saveOv(){
+  const s=JSON.stringify(ov);
+  try{ localStorage.setItem(OV_KEY,s); }catch(e){}
+  try{ if(window.storage && window.storage.set) window.storage.set(OV_KEY,s,false); }catch(e){}
+}
+const mdpById=id=>MDP.find(m=>m.id===id);
+let side="A";
+const bySide=a=>a.filter(x=>x.side===side);
+const legacy=n=>RENAMES[String(n||"").trim().toUpperCase()]||n;
+const upsMdp=id=>ov.ups[id]||UPS.find(u=>u.id===id).mdp;
+function stsSrc(s){ const o=ov.sts[s.id]||{}; return {s1:o.s1||s.s1, s2:o.s2||s.s2, ok:(o.ok===undefined?!!s.vf:!!o.ok)}; }
+const upsOfMdp=m=>UPS.filter(u=>upsMdp(u.id)===m).map(u=>u.id);
+const stsOfMdp=m=>STS.filter(s=>{const x=stsSrc(s);return x.s1===m||x.s2===m;});
+const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const mshort=id=>{const m=mdpById(id);return m?m.n:"?";};
+
+/* ---------- geometry (per side) ---------- */
+const W=1080;
+let H=975;
+const LVX=8,LVW=96,LVH=54, PXX=168,PW=34, TXX=216,TW=34, UX=262,UW=118,UH=40, MX=440,MW=176,MH=72, SX=744,SW=118,SH=28, LX=884;
+const POS={};
+const UPSDEF={}; UPS.forEach(u=>UPSDEF[u.id]=u.mdp);
+let mdpY=i=>62+i*118, stsY=i=>44+i*34, dcY=j=>0;
+function layout(){
+  Object.keys(POS).forEach(k=>delete POS[k]);
+  const SM=bySide(MDP), SS=bySide(STS), SD=bySide(DC), SU=bySide(UPS), SL=bySide(LVSB);
+  dcY=j=>44+SS.length*34+40+j*34;
+  SM.forEach((m,i)=>{ POS["M:"+m.id]={x:MX,y:mdpY(i),w:MW,h:MH}; });
+  SU.forEach(u=>{ const g=SM.findIndex(m=>m.id===UPSDEF[u.id]);
+    const k=SU.filter(z=>UPSDEF[z.id]===UPSDEF[u.id]).findIndex(z=>z.id===u.id);
+    const p=POS["U:"+u.id]={x:UX,y:mdpY(g)+(k%2?27:-27),w:UW,h:UH};
+    const inp=INP[u.id]; if(!inp) return;
+    inp.src.forEach((lid,j)=>{ POS["P:"+u.id+":"+j]= inp.mts ? {x:PXX,y:p.y+(j?12:-12),w:PW,h:20} : {x:PXX,y:p.y,w:PW,h:26}; });
+    if(inp.mts) POS["T:"+u.id]={x:TXX,y:p.y,w:TW,h:30};
+  });
+  SL.forEach(l=>{ const ys=l.anchor.map(id=>POS["U:"+id]).filter(Boolean).map(q=>q.y);
+    POS["L:"+l.id]={x:LVX,y:ys.reduce((a,b)=>a+b,0)/Math.max(1,ys.length),w:LVW,h:LVH}; });
+  SS.forEach((s,i)=>{ POS["S:"+s.id]={x:SX,y:stsY(i),w:SW,h:SH}; });
+  SD.forEach((d,j)=>{ POS["D:"+d.id]={x:SX,y:dcY(j),w:SW,h:SH}; });
+  H=Math.max(dcY(SD.length-1)+50, mdpY(SM.length-1)+MH/2+60);
+}
+
+function buildLinks(){
+  const L=[];
+  // LVSB -> PIU (-> MTS) -> UPS
+  const lvOut={}; bySide(LVSB).forEach(l=>lvOut[l.id]=[]);
+  bySide(UPS).forEach(u=>{ const inp=INP[u.id]; if(!inp) return;
+    inp.src.forEach((lid,j)=>{ if(lvOut[lid]) lvOut[lid].push({u:u.id,j:j,y:POS["P:"+u.id+":"+j].y}); }); });
+  bySide(LVSB).forEach(lv=>{ const p=POS["L:"+lv.id], list=lvOut[lv.id].sort((a,b)=>a.y-b.y);
+    const step=list.length>1?Math.min(8,(LVH-14)/(list.length-1)):0;
+    list.forEach((o,k)=>{ const inp=INP[o.u], pp=POS["P:"+o.u+":"+o.j], up=POS["U:"+o.u];
+      L.push({k:"l2p",ups:o.u,lvsb:lv.id,c:lv.c,x1:p.x+p.w,y1:p.y+(k-(list.length-1)/2)*step,x2:pp.x,y2:pp.y});
+      if(inp.mts){ const tp=POS["T:"+o.u]; L.push({k:"p2t",ups:o.u,lvsb:lv.id,c:lv.c,x1:pp.x+pp.w,y1:pp.y,x2:tp.x,y2:tp.y+(o.j?7:-7)}); }
+      else L.push({k:"p2u",ups:o.u,lvsb:lv.id,c:lv.c,x1:pp.x+pp.w,y1:pp.y,x2:up.x,y2:up.y});
+    }); });
+  bySide(UPS).forEach(u=>{ const inp=INP[u.id]; if(inp&&inp.mts){ const tp=POS["T:"+u.id], up=POS["U:"+u.id];
+    L.push({k:"t2u",ups:u.id,lvsb:inp.src[0],c:lvById(inp.src[0]).c,x1:tp.x+tp.w,y1:tp.y,x2:up.x,y2:up.y}); } });
+  // UPS -> MDP
+  bySide(MDP).forEach(m=>{
+    const mem=upsOfMdp(m.id).filter(x=>POS["U:"+x]), p=POS["M:"+m.id];
+    mem.forEach((uid,k)=>{
+      const q=POS["U:"+uid];
+      const ty=p.y+(mem.length>1?(k-(mem.length-1)/2)*16:0);
+      L.push({k:"u2m",ups:uid,mdp:m.id,c:m.c,x1:q.x+q.w,y1:q.y,x2:p.x,y2:ty});
+    });
+  });
+  // MDP -> STS / DC : spread outgoing sockets
+  const out={}; bySide(MDP).forEach(m=>out[m.id]=[]);
+  bySide(STS).forEach(s=>{ const x=stsSrc(s);
+    out[x.s1]&&out[x.s1].push({t:"sts",id:s.id,src:"S1",ok:x.ok,dy:-5});
+    out[x.s2]&&out[x.s2].push({t:"sts",id:s.id,src:"S2",ok:x.ok,dy:5}); });
+  bySide(DC).forEach(d=>out[d.mdp]&&out[d.mdp].push({t:"dc",id:d.id,src:"",ok:true,dy:0}));
+  bySide(MDP).forEach(m=>{
+    const p=POS["M:"+m.id], list=out[m.id].map(o=>{const q=POS[(o.t==="sts"?"S:":"D:")+o.id]; return Object.assign(o,{q});});
+    list.sort((a,b)=>a.q.y-b.q.y);
+    const step=list.length>1?Math.min(4,(MH-12)/(list.length-1)):0;
+    list.forEach((o,k)=>{
+      const oy=p.y+(k-(list.length-1)/2)*step;
+      L.push({k:o.t==="sts"?"m2s":"m2d",mdp:m.id,sts:o.t==="sts"?o.id:null,dc:o.t==="dc"?o.id:null,src:o.src,
+              draft:!o.ok,c:m.c,x1:p.x+p.w,y1:oy,x2:o.q.x,y2:o.q.y+o.dy});
+    });
+  });
+  return L;
+}
+const pathD=l=>{const xm=(l.x1+l.x2)/2;return "M"+l.x1+" "+l.y1+" C"+xm+" "+l.y1+","+xm+" "+l.y2+","+l.x2+" "+l.y2;};
+
+/* ---------- live status from the monitoring log ---------- */
+function STATE_(){ try{ return window.__getState && window.__getState(); }catch(e){ return null; } }
+function alarm(spec,v,rk){ try{ return window.__alarmClass(spec,v,(rk&&window.__effSpec)?window.__effSpec(rk):undefined); }catch(e){ return ""; } }
+function norm(n){ return String(n||"").trim().toUpperCase().replace(/\s+/g,""); }
+function findLive(type,id){
+  const S=STATE_(); if(!S||!S.roomOrder) return null;
+  for(const k of S.roomOrder){
+    const r=S[k]; if(!r) continue;
+    const list=type==="ups"?r.ups:r.sts;
+    const idx=(list||[]).findIndex(u=>norm(legacy(u.n))===norm(id));
+    if(idx>-1) return {room:r,roomKey:k,u:list[idx],idx};
+  }
+  return null;
+}
+function liveStatus(type,id){
+  const f=findLive(type,id);
+  if(!f) return {st:"none",found:false};
+  const u=f.u; const bad=[]; let has=false; const rk=f.roomKey; const chk=(spec,v,label)=>{ if(v!==null&&v!==undefined&&v!==""){ has=true; const a=alarm(spec,v,rk); if(a==="alarm") bad.push(label+" "+v); else if(a==="warn") bad.push("~"+label+" "+v);} };
+  if(type==="ups"){
+    (u.iv||[]).forEach((v,i)=>chk("upsV",v,"IN L"+(i+1))); (u.ov||[]).forEach((v,i)=>chk("upsV",v,"OUT L"+(i+1)));
+    chk("charge",u.cc,"Charge A"); chk("roomT",u.rtemp,"Room °C");
+    [u.lk,u.bv,u.rt].forEach(v=>{ if(v!=null&&v!=="") has=true; });
+  } else {
+    (u.s1||[]).forEach((v,i)=>chk("stsSrc",v,"S1 L"+(i+1))); (u.s2||[]).forEach((v,i)=>chk("stsSrc",v,"S2 L"+(i+1)));
+    (u.fq||[]).forEach((v,i)=>chk("freq",v,"Freq S"+(i+1)));
+    (u.lp||[]).forEach(v=>{ if(v!=null&&v!=="") has=true; });
+  }
+  const hard=bad.filter(b=>b[0]!=="~"), soft=bad.filter(b=>b[0]==="~").map(b=>b.slice(1));
+  const st=!has?"none":hard.length?"alarm":soft.length?"warn":"ok";
+  return {st,found:true,f,issues:hard,advis:soft};
+}
+function worst(a){ return a.includes("alarm")?"alarm":a.includes("warn")?"warn":a.includes("ok")?"ok":"none"; }
+let ST={}; // computed status per node key
+function computeStatus(){
+  ST={};
+  UPS.forEach(u=>ST["U:"+u.id]=liveStatus("ups",u.id));
+  STS.forEach(s=>ST["S:"+s.id]=liveStatus("sts",s.id));
+  MDP.forEach(m=>{ ST["M:"+m.id]={st:worst(upsOfMdp(m.id).map(i=>ST["U:"+i].st))}; });
+  DC.forEach(d=>{ ST["D:"+d.id]={st:ST["M:"+d.mdp].st}; });
+}
+
+/* ---------- selection / trace ---------- */
+let sel=null, zoom=980, editing=false;
+function trace(){
+  const nodes=new Set(), on=new Set(), ctx=new Set(); const L=LINKS;
+  if(!sel) return {nodes,on,ctx};
+  const isIn=l=>l.k==="l2p"||l.k==="p2u"||l.k==="p2t"||l.k==="t2u";
+  const addInput=uid=>{ nodes.add("U:"+uid); const inp=INP[uid]; if(!inp) return;
+    inp.src.forEach((lid,j)=>{ nodes.add("L:"+lid); nodes.add("P:"+uid+":"+j); });
+    if(inp.mts) nodes.add("T:"+uid);
+    L.forEach((l,i)=>{ if(l.ups===uid&&isIn(l)) on.add(i); }); };
+  const addMdp=mid=>{
+    nodes.add("M:"+mid); upsOfMdp(mid).forEach(addInput);
+    L.forEach((l,i)=>{
+      if(l.mdp===mid&&l.k==="u2m") on.add(i);
+      if(l.mdp===mid&&(l.k==="m2s"||l.k==="m2d")){ on.add(i); nodes.add((l.sts?"S:"+l.sts:"D:"+l.dc)); }
+    });
+  };
+  const ctxOther=()=>L.forEach((l,i)=>{ if(l.k==="m2s"&&nodes.has("S:"+l.sts)&&!on.has(i)) ctx.add(i); });
+  if(sel.t==="U"||sel.t==="M"){ addMdp(sel.t==="U"?upsMdp(sel.id):sel.id); ctxOther(); }
+  else if(sel.t==="L"){ nodes.add("L:"+sel.id);
+    const mids=new Set(); bySide(UPS).forEach(u=>{ if(INP[u.id]&&INP[u.id].src.includes(sel.id)) mids.add(upsMdp(u.id)); });
+    mids.forEach(addMdp); ctxOther(); }
+  else if(sel.t==="S"){
+    nodes.add("S:"+sel.id);
+    const x=stsSrc(STS.find(s=>s.id===sel.id));
+    [x.s1,x.s2].forEach(mid=>{ nodes.add("M:"+mid); upsOfMdp(mid).forEach(addInput); });
+    L.forEach((l,i)=>{
+      if(l.k==="m2s"&&l.sts===sel.id) on.add(i);
+      if(l.k==="u2m"&&(l.mdp===x.s1||l.mdp===x.s2)) on.add(i);
+    });
+  } else if(sel.t==="D"){
+    const d=DC.find(z=>z.id===sel.id); nodes.add("D:"+d.id); nodes.add("M:"+d.mdp);
+    upsOfMdp(d.mdp).forEach(addInput);
+    L.forEach((l,i)=>{ if((l.k==="m2d"&&l.dc===d.id)||(l.k==="u2m"&&l.mdp===d.mdp)) on.add(i); });
+  }
+  return {nodes,on,ctx};
+}
+
+/* ---------- drawing ---------- */
+let LINKS=[];
+function nodeSvg(key,cls,lines,tr){
+  const p=POS[key], x=p.x, y=p.y-p.h/2;
+  const st=(ST[key]&&ST[key].st)||"none";
+  const c=["mm-node","st-"+st,cls].filter(Boolean).join(" ");
+  let t="";
+  if(lines.length===1) t='<text x="'+(x+12)+'" y="'+(p.y+4)+'">'+esc(lines[0])+'</text>';
+  else t='<text x="'+(x+12)+'" y="'+(p.y-(lines.length>2?7:3))+'">'+esc(lines[0])+'</text>'
+        +lines.slice(1).map((s,i)=>'<text class="sub" x="'+(x+12)+'" y="'+(p.y+(lines.length>2?6:10)+i*11)+'">'+esc(s)+'</text>').join("");
+  return '<g class="'+c+'" data-key="'+esc(key)+'"><rect class="box" x="'+x+'" y="'+y+'" width="'+p.w+'" height="'+p.h+'" rx="7"/>'
+    +'<circle class="led" cx="'+(x+p.w-9)+'" cy="'+(y+9)+'" r="3.4"/>'+t+'</g>';
+}
+function smallNode(key,label,cls){
+  const p=POS[key], x=p.x, y=p.y-p.h/2;
+  return '<g class="mm-node small '+(cls||"")+'" data-key="'+esc(key)+'"><rect class="box" x="'+x+'" y="'+y+'" width="'+p.w+'" height="'+p.h+'" rx="4"/>'
+    +'<text x="'+(x+p.w/2)+'" y="'+(p.y+3)+'" text-anchor="middle" style="font-size:'+(p.h<24?8:9)+'px">'+label+'</text></g>';
+}
+function draw(){
+  computeStatus(); layout(); LINKS=buildLinks();
+  const T=trace(), has=!!sel;
+  let s='<text class="mm-colhead" x="'+LVX+'" y="18">LVSB (INPUT)</text><text class="mm-colhead" x="'+PXX+'" y="18">PIU/MTS</text><text class="mm-colhead" x="'+UX+'" y="18">UPS</text><text class="mm-colhead" x="'+MX+'" y="18">MDP · UPS-SERVING STS PANEL ('+(side==="A"?"GA":"GB")+')</text>'
+       +'<text class="mm-colhead" x="'+SX+'" y="18">STS</text><text class="mm-colhead" x="'+LX+'" y="18">SERVING LOAD (DP)</text>'
+       +'<text class="mm-colhead" x="'+SX+'" y="'+(dcY(0)-26)+'">DATA CENTER PANELS</text>';
+  // links
+  let g="", dots="", tags="";
+  LINKS.forEach((l,i)=>{
+    const isOn=T.on.has(i), isCtx=T.ctx.has(i);
+    const cls="mm-link"+(isOn?" on":isCtx?" ctx":has?" off":"")+(l.draft?" draft":"");
+    const d=pathD(l);
+    g+='<path class="'+cls+'" d="'+d+'" stroke="'+l.c+'"/>';
+    if(isOn){
+      dots+='<circle class="mm-dot" r="3.6" fill="'+l.c+'" style="color:'+l.c+'"><animateMotion dur="'+(l.k==="u2m"?"1.4":l.k==="m2s"||l.k==="m2d"?"1.9":"1.0")+'s" repeatCount="indefinite" path="'+d+'"/></circle>';
+      if(l.k==="m2s") tags+='<text class="mm-tag" x="'+(l.x2-17)+'" y="'+(l.y2+3)+'">'+l.src+'</text>';
+    }
+    if(isCtx&&l.k==="m2s") tags+='<text class="mm-tag" style="opacity:.6" x="'+(l.x2-17)+'" y="'+(l.y2+3)+'">'+l.src+'</text>';
+  });
+  s+=g+dots+tags;
+  // nodes
+  const cl=(key)=>{ const isSel=sel&&((sel.t+":"+sel.id)===key); return isSel?"sel on":T.nodes.has(key)?"on":has?"dim":""; };
+  bySide(LVSB).forEach(l=>{ s+=nodeSvg("L:"+l.id,cl("L:"+l.id),[l.id,l.loc]); });
+  bySide(UPS).forEach(u=>{ const inp=INP[u.id]; if(!inp) return;
+    inp.src.forEach((lid,j)=>{ s+=smallNode("P:"+u.id+":"+j,"PIU",cl("P:"+u.id+":"+j),T); });
+    if(inp.mts) s+=smallNode("T:"+u.id,"MTS",cl("T:"+u.id),T); });
+  bySide(UPS).forEach(u=>{ s+=nodeSvg("U:"+u.id,cl("U:"+u.id),[u.id,u.kva+" kVA · "+mshort(upsMdp(u.id))],T); });
+  bySide(MDP).forEach(m=>{ s+=nodeSvg("M:"+m.id,cl("M:"+m.id),[m.pre,m.n,"UPS ROOM "+m.room],T); });
+  const load=(p,dp,sub,dim,warn)=>{ const o=dim?.3:1;
+    return '<line x1="'+(p.x+p.w)+'" y1="'+p.y+'" x2="'+(LX-6)+'" y2="'+p.y+'" stroke="var(--text-faint)" stroke-width="1.6" style="opacity:'+o+'"/>'
+      +'<text class="mm-load" style="opacity:'+o+'" x="'+LX+'" y="'+(p.y-1)+'">'+esc(dp)+(warn?" ⚠":"")+'</text>'
+      +'<text class="mm-load" style="opacity:'+(o*.75)+';font-size:8.5px" x="'+LX+'" y="'+(p.y+10)+'">'+esc(sub)+'</text>'; };
+  bySide(STS).forEach(t=>{ s+=nodeSvg("S:"+t.id,cl("S:"+t.id),[t.id+"  "+t.amps+"A"],T);
+    s+=load(POS["S:"+t.id],t.dp,t.zone,has&&!T.nodes.has("S:"+t.id),!stsSrc(t).ok); });
+  bySide(DC).forEach(d=>{ s+=nodeSvg("D:"+d.id,cl("D:"+d.id),[d.name]);
+    s+=load(POS["D:"+d.id],d.dp,d.site,has&&!T.nodes.has("D:"+d.id),false); });
+  const svg=document.getElementById("mmSvg");
+  svg.setAttribute("viewBox","0 0 "+W+" "+H); svg.innerHTML=s; svg.style.width=zoom+"px";
+  document.querySelectorAll(".mm-side").forEach(b=>b.classList.toggle("on",b.dataset.side===side));
+  drawCard();
+}
+
+/* ---------- info card ---------- */
+const fmt=v=>(v===null||v===undefined||v==="")?"—":v;
+const chip=(t,id,label,extra)=>'<button type="button" class="mm-chip '+(extra||"")+'" data-go="'+t+":"+esc(id)+'">'+esc(label||id)+'</button>';
+const pill=st=>({ok:'<span class="mm-pill ok">● IN SPEC</span>',alarm:'<span class="mm-pill alarm">▲ OUT OF SPEC</span>',warn:'<span class="mm-pill warn">◆ ADVISORY</span>',none:'<span class="mm-pill">○ NO READING</span>'}[st]||"");
+function kv(label,val,bad){ return '<div class="'+(bad?"bad":"")+'"><span>'+label+'</span>'+esc(fmt(val))+'</div>'; }
+function mdpChips(id){ const m=mdpById(id); return chip("M",id,"MDP "+m.n+" (Rm "+m.room+")"); }
+
+function inputRow(uid){
+  const inp=INP[uid]; if(!inp) return "";
+  return '<div class="mm-row"><b>Input from</b>'+inp.src.map(lid=>chip("L",lid,lid+" ("+lvById(lid).loc+")")).join("")
+    +'<span style="color:var(--text-dim)">via '+(inp.mts?"PIU ×2 → MTS (dual source)":"PIU")+'</span></div>';
+}
+function mdpInputRow(mid){
+  const set=[]; upsOfMdp(mid).forEach(u=>{ (INP[u]||{src:[]}).src.forEach(l=>{ if(!set.includes(l)) set.push(l); }); });
+  return set.length?'<div class="mm-row"><b>Input from</b>'+set.map(l=>chip("L",l,l+" ("+lvById(l).loc+")")).join("")+'</div>':"";
+}
+function drawCard(){
+  const c=document.getElementById("mmCard");
+  if(!sel){
+    const unv=bySide(STS).filter(s=>!stsSrc(s).ok).length, tot=bySide(STS).length;
+    c.innerHTML='<h3>'+(side==="A"?"Group-A":"Group-B")+' · tap any equipment to trace its power path</h3>'
+      +'<div class="sub">UPS → MDP → STS / data-center panels. Selected path animates; the dotted lines show the other source of each STS. Each STS is wired straight to the serving-load DP written beside it.</div>'
+      +'<div class="mm-legend"><span><i style="border-top-style:solid"></i>S1 / feed</span><span><i style="border-top-style:dashed"></i>other source</span>'
+      +'<span style="color:var(--green)">● in spec</span><span style="color:var(--red)">▲ out of spec</span><span style="color:var(--amber)">◆ advisory</span><span>○ no reading</span></div>'
+      +(unv?'<div class="mm-row"><span class="mm-pill draft">⚠ '+unv+' of '+tot+' STS source assignments are still DRAFT</span></div><div class="sub">Confirm each against the as-built and tick “Verified” in its Edit panel. Nodes without a ⚠ are confirmed.</div>':"");
+    return;
+  }
+  let h="";
+  if(sel.t==="U"){
+    const u=UPS.find(x=>x.id===sel.id), mid=upsMdp(u.id), L=ST["U:"+u.id];
+    const partner=upsOfMdp(mid).filter(x=>x!==u.id);
+    const fed=stsOfMdp(mid), dcs=DC.filter(d=>d.mdp===mid);
+    h+='<h3>'+esc(u.id)+' '+pill(L.st)+'</h3><div class="sub">'+u.kva+' kVA UPS · parallel pair with '+(partner.length?esc(partner.join(", ")):"none")+'</div>';
+    h+='<div class="mm-row"><b>Output to</b>'+mdpChips(mid)+'</div>';
+    h+=inputRow(u.id);
+    h+='<div class="mm-row"><b>Then feeds STS</b>'+(fed.length?fed.map(s=>{const x=stsSrc(s);return chip("S",s.id,s.id+(x.s1===mid?" · S1":" · S2"),x.s1===mid?"":"s2");}).join(""):"—")+'</div>';
+    if(dcs.length) h+='<div class="mm-row"><b>Data center</b>'+dcs.map(d=>chip("D",d.id,d.name+" ("+d.site+")")).join("")+'</div>';
+    h+=liveBlock("ups",u.id,L);
+    h+=editUps(u.id,mid);
+  } else if(sel.t==="L"){
+    const lv=lvById(sel.id), ups=bySide(UPS).filter(u=>INP[u.id]&&INP[u.id].src.includes(lv.id));
+    const mids=[...new Set(ups.map(u=>upsMdp(u.id)))];
+    const sts=[...new Set(mids.flatMap(m=>stsOfMdp(m).map(s=>s.id)))];
+    h+='<h3>'+esc(lv.id)+'</h3><div class="sub">Low-voltage switchboard · '+esc(lv.loc)+' · feeds '+ups.length+' UPS through PIUs</div>';
+    h+='<div class="mm-row"><b>Feeds UPS</b>'+ups.map(u=>chip("U",u.id,u.id+(INP[u.id].mts?" · MTS":""),INP[u.id].mts?"s2":"")).join("")+'</div>';
+    h+='<div class="mm-row"><b>Then MDP</b>'+mids.map(m=>mdpChips(m)).join("")+'</div>';
+    h+='<div class="mm-row"><b>Then STS</b>'+(sts.length?sts.map(i=>chip("S",i)).join(""):"—")+'</div>';
+  } else if(sel.t==="M"){
+    const m=mdpById(sel.id), ups=upsOfMdp(m.id), fed=stsOfMdp(m.id), dcs=DC.filter(d=>d.mdp===m.id);
+    h+='<h3>'+esc(m.pre)+' '+esc(m.n)+' '+pill(ST["M:"+m.id].st)+'</h3><div class="sub">Located in UPS Room '+esc(m.room)+' · fed by '+ups.length+' UPS in parallel'+(m.grp?' ('+m.grp+')':'')+'</div>';
+    h+=mdpInputRow(m.id);
+    h+='<div class="mm-row"><b>Fed by UPS</b>'+ups.map(u=>chip("U",u)).join("")+'</div>';
+    h+='<div class="mm-row"><b>Feeds STS</b>'+(fed.length?fed.map(s=>{const x=stsSrc(s);return chip("S",s.id,s.id+(x.s1===m.id?" · S1":" · S2"),x.s1===m.id?"":"s2");}).join(""):"—")+'</div>';
+    if(dcs.length) h+='<div class="mm-row"><b>Data center</b>'+dcs.map(d=>chip("D",d.id,d.name)).join("")+'</div>';
+  } else if(sel.t==="S"){
+    const s=STS.find(x=>x.id===sel.id), x=stsSrc(s), L=ST["S:"+s.id];
+    h+='<h3>'+esc(s.id)+' '+pill(L.st)+(x.ok?'':' <span class="mm-pill draft">⚠ DRAFT SOURCES</span>')+'</h3><div class="sub">'+s.amps+' A STS · located in UPS Room '+esc(s.room)+'</div>';
+    h+='<div class="mm-row"><b>Source 1</b>'+mdpChips(x.s1)+'<span style="color:var(--text-dim)">← '+upsOfMdp(x.s1).map(esc).join(" + ")+'</span></div>';
+    h+='<div class="mm-row"><b>Source 2</b>'+mdpChips(x.s2)+'<span style="color:var(--text-dim)">← '+upsOfMdp(x.s2).map(esc).join(" + ")+'</span></div>';
+    h+='<div class="mm-row"><b>Serving load</b><span><span style="color:var(--text);font-size:12px">'+esc(s.dp)+'</span> · '+esc(s.zone)+' <span style="color:var(--text-faint)">(direct connection)</span></span></div>';
+    h+=liveBlock("sts",s.id,L);
+    h+=editSts(s,x);
+  } else if(sel.t==="D"){
+    const d=DC.find(x=>x.id===sel.id);
+    h+='<h3>'+esc(d.name)+' '+pill(ST["D:"+d.id].st)+'</h3><div class="sub">'+esc(d.dp)+' · '+esc(d.site)+'</div>';
+    h+='<div class="mm-row"><b>Fed from</b>'+mdpChips(d.mdp)+'</div><div class="mm-row"><b>UPS behind it</b>'+upsOfMdp(d.mdp).map(u=>chip("U",u)).join("")+'</div>';
+  }
+  c.innerHTML=h;
+}
+function liveBlock(type,id,L){
+  if(!L.found) return '<div class="sub" style="margin-top:8px">Not in the monitoring log yet — add a unit named “'+esc(id)+'” to see its live readings here.</div>';
+  const u=L.f.u, room=L.f.room.label;
+  let h='<div class="sub" style="margin-top:8px">Live log · '+esc(room)+'</div><div class="mm-kv">';
+  const A=(a,i)=>a&&a[i]!=null?a[i]:null;
+  if(type==="ups"){
+    const bad=(spec,v)=>alarm(spec,v,L.f.roomKey)==="alarm";
+    h+=kv("Input V",[0,1,2].map(i=>fmt(A(u.iv,i))).join(" / "),(u.iv||[]).some(v=>bad("upsV",v)));
+    h+=kv("Output V",[0,1,2].map(i=>fmt(A(u.ov,i))).join(" / "),(u.ov||[]).some(v=>bad("upsV",v)));
+    h+=kv("Load kVA",u.lk)+kv("Total kVA",u.tl)+kv("Batt VDC",u.bv)+kv("Runtime min",u.rt)+kv("Charge A",u.cc,bad("charge",u.cc))+kv("Room °C",u.rtemp);
+  } else {
+    const bad=(spec,v)=>alarm(spec,v,L.f.roomKey)==="alarm";
+    h+=kv("Src 1 V",[0,1,2].map(i=>fmt(A(u.s1,i))).join(" / "),(u.s1||[]).some(v=>bad("stsSrc",v)));
+    h+=kv("Src 2 V",[0,1,2].map(i=>fmt(A(u.s2,i))).join(" / "),(u.s2||[]).some(v=>bad("stsSrc",v)));
+    h+=kv("Load %",[0,1,2].map(i=>fmt(A(u.lp,i))).join(" / "))+kv("Temp °C",u.temp)+kv("Freq S1/S2",fmt(A(u.fq,0))+" / "+fmt(A(u.fq,1)),(u.fq||[]).some(v=>bad("freq",v)));
+  }
+  h+='</div>';
+  if(L.issues&&L.issues.length) h+='<div class="mm-row"><span class="mm-pill alarm">'+esc(L.issues.join(" · "))+'</span></div>';
+  return h;
+}
+const mdpOptions=cur=>bySide(MDP).map(m=>'<option value="'+m.id+'"'+(m.id===cur?" selected":"")+'>'+esc(m.n)+' (Rm '+esc(m.room)+')</option>').join("");
+function editUps(id,mid){
+  return '<div class="mm-row"><button class="btn ghost" data-act="edit">✎ Edit connection</button></div>'
+   +'<div class="mm-edit'+(editing?" open":"")+'"><div class="mm-row"><b>Feeds MDP</b><select data-ed="ups" data-id="'+esc(id)+'">'+mdpOptions(mid)+'</select>'
+   +'<button class="btn ghost" data-act="reset">Reset to drawing</button></div></div>';
+}
+function editSts(s,x){
+  return '<div class="mm-row"><button class="btn ghost" data-act="edit">✎ Edit sources</button></div>'
+   +'<div class="mm-edit'+(editing?" open":"")+'"><div class="mm-row"><b>Source 1</b><select data-ed="s1" data-id="'+s.id+'">'+mdpOptions(x.s1)+'</select></div>'
+   +'<div class="mm-row"><b>Source 2</b><select data-ed="s2" data-id="'+s.id+'">'+mdpOptions(x.s2)+'</select></div>'
+   +'<div class="mm-row"><label style="display:flex;gap:6px;align-items:center"><input type="checkbox" data-ed="ok" data-id="'+s.id+'"'+(x.ok?" checked":"")+'> Verified against as-built</label>'
+   +'<button class="btn ghost" data-act="reset">Reset to drawing</button></div></div>';
+}
+
+/* ---------- UI shell ---------- */
+function build(){
+  if(document.getElementById("mimicOverlay")) return;
+  const o=document.createElement("div"); o.id="mimicOverlay"; o.className="no-print";
+  const opts='<option value="">Jump to equipment…</option>'
+    +'<optgroup label="LVSB">'+LVSB.map(l=>'<option value="L:'+l.id+'">'+l.id+' ('+l.loc+')</option>').join("")+'</optgroup>'
+    +'<optgroup label="UPS">'+UPS.map(u=>'<option value="U:'+u.id+'">'+u.id+'</option>').join("")+'</optgroup>'
+    +'<optgroup label="MDP">'+MDP.map(m=>'<option value="M:'+m.id+'">'+m.pre+' '+m.n+'</option>').join("")+'</optgroup>'
+    +'<optgroup label="STS">'+STS.map(s=>'<option value="S:'+s.id+'">'+s.id+'</option>').join("")+'</optgroup>'
+    +'<optgroup label="Data center / access">'+DC.map(d=>'<option value="D:'+d.id+'">'+d.side+' · '+d.name+'</option>').join("")+'</optgroup>';
+  o.innerHTML='<div class="mm-head"><h2><span style="color:var(--amber)">⚡</span> Power-Path Mimic</h2>'
+    +'<button class="btn ghost mm-side" data-side="A">A-SIDE</button><button class="btn ghost mm-side" data-side="B">B-SIDE</button>'
+    +'<select id="mmJump">'+opts+'</select>'
+    +'<button class="btn ghost" id="mmZm" title="Zoom out">–</button><button class="btn ghost" id="mmZp" title="Zoom in">+</button>'
+    +'<button class="btn ghost" id="mmClr">Clear</button><button class="btn primary" id="mmX">✕ Close</button></div>'
+    +'<div class="mm-wrap" id="mmWrap"><svg id="mmSvg" viewBox="0 0 '+W+' '+H+'" xmlns="'+"http://www.w3.org/2000/svg"+'"></svg></div>'
+    +'<div class="mm-card" id="mmCard"></div>';
+  document.body.appendChild(o);
+  const $=id=>document.getElementById(id);
+  $("mmX").onclick=close;
+  o.querySelectorAll(".mm-side").forEach(b=>b.onclick=()=>{ side=b.dataset.side; sel=null; editing=false; $("mmJump").value=""; draw(); $("mmWrap").scrollTo({left:0,top:0}); });
+  $("mmClr").onclick=()=>{ sel=null; editing=false; $("mmJump").value=""; draw(); };
+  $("mmZp").onclick=()=>{ zoom=Math.min(1600,zoom+140); draw(); };
+  $("mmZm").onclick=()=>{ zoom=Math.max(560,zoom-140); draw(); };
+  $("mmJump").onchange=e=>{ if(e.target.value) pick(e.target.value); };
+  $("mmSvg").addEventListener("click",e=>{
+    const g=e.target.closest(".mm-node");
+    if(g){ pick(g.getAttribute("data-key")); } else { sel=null; editing=false; $("mmJump").value=""; draw(); }
+  });
+  const card=$("mmCard");
+  card.addEventListener("click",e=>{
+    const go=e.target.closest("[data-go]"); if(go){ pick(go.getAttribute("data-go")); return; }
+    const act=e.target.closest("[data-act]"); if(!act) return;
+    if(act.dataset.act==="edit"){ editing=!editing; drawCard(); }
+    if(act.dataset.act==="reset"){ if(sel.t==="U") delete ov.ups[sel.id]; if(sel.t==="S") delete ov.sts[sel.id]; saveOv(); draw(); }
+  });
+  card.addEventListener("change",e=>{
+    const t=e.target, kind=t.getAttribute("data-ed"); if(!kind) return; const id=t.getAttribute("data-id");
+    if(kind==="ups") ov.ups[id]=t.value;
+    else { const o=ov.sts[id]=ov.sts[id]||{}; if(kind==="ok") o.ok=t.checked; else o[kind]=t.value; }
+    saveOv(); draw();
+  });
+  document.addEventListener("keydown",e=>{ if(e.key==="Escape"&&o.classList.contains("open")) close(); });
+}
+function pick(key){
+  let t=key.charAt(0), id=key.slice(2);
+  if(t==="P"||t==="T"){ t="U"; id=id.split(":")[0]; key="U:"+id; }
+  const item=(t==="U"?UPS:t==="M"?MDP:t==="S"?STS:t==="L"?LVSB:DC).find(x=>x.id===id);
+  if(item&&item.side!==side) side=item.side;
+  sel={t,id}; editing=false;
+  const j=document.getElementById("mmJump"); if(j) j.value=key;
+  draw();
+  const p=POS[key], wrap=document.getElementById("mmWrap"), sc=zoom/W;
+  if(p&&wrap) wrap.scrollTo({left:Math.max(0,(p.x+p.w/2)*sc-wrap.clientWidth/2),top:Math.max(0,p.y*sc-wrap.clientHeight/2),behavior:"smooth"});
+}
+function open(name){
+  build();
+  document.getElementById("mimicOverlay").classList.add("open");
+  document.body.style.overflow="hidden";
+  sel=null; editing=false;
+  const n=norm(legacy(name));
+  if(n){
+    const u=UPS.find(x=>norm(x.id)===n), s=STS.find(x=>norm(x.id)===n), lv=LVSB.find(x=>norm(x.id)===n);
+    if(lv){ sel={t:"L",id:lv.id}; side=lv.side; } else if(u){ sel={t:"U",id:u.id}; side=u.side; } else if(s){ sel={t:"S",id:s.id}; side=s.side; }
+  }
+  draw();
+  if(sel) pick(sel.t+":"+sel.id);
+  else if(n){
+    document.getElementById("mmCard").insertAdjacentHTML("afterbegin",'<div class="mm-row"><span class="mm-pill warn">“'+esc(name)+'” is not on the Group-A / Group-B drawings.</span></div>');
+  }
+}
+function close(){
+  const o=document.getElementById("mimicOverlay"); if(o) o.classList.remove("open");
+  document.body.style.overflow="";
+}
+function exportOv(){ return JSON.parse(JSON.stringify(ov)); }
+function importOv(o){   // merge a backup's edits; never wipe ours
+  if(!o||typeof o!=="object") return;
+  Object.assign(ov.ups,o.ups||{});
+  Object.keys(o.sts||{}).forEach(k=>{ ov.sts[k]=Object.assign({},o.sts[k],ov.sts[k]||{}); });
+  saveOv();
+}
+window.MIMIC={open,close,exportOv,importOv};
+})();
+
+document.getElementById('btnMimic').addEventListener('click',function(){ MIMIC.open(); });
 </script>
 </body>
 </html>
