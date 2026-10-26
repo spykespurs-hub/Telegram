@@ -987,7 +987,7 @@
   .mm-wrap{ flex:1; overflow:auto; background:radial-gradient(800px 400px at 20% 0%, #101c26 0%, transparent 60%), var(--bg); touch-action:pan-x pan-y pinch-zoom; }
   svg#mmSvg{ display:block; height:auto; margin:0 auto; }
   .mm-colhead{ fill:var(--text-faint); font-family:var(--font-mono); font-size:11px; letter-spacing:1.4px; }
-  .mm-link{ fill:none; stroke-width:1.4; opacity:.30; transition:opacity .2s; }
+  .mm-link{ fill:none; stroke-width:1.5; opacity:.42; transition:opacity .2s; }
   .mm-link.off{ opacity:.07; }
   .mm-link.ctx{ opacity:.6; stroke-width:1.6; stroke-dasharray:2 4; }
   .mm-link.on{ opacity:1; stroke-width:2.8; stroke-dasharray:7 9; animation:mmflow .8s linear infinite; }
@@ -1040,6 +1040,13 @@
   .mm-node.small rect.box{ fill:var(--panel-2); }
   .mm-link.flow{ opacity:.9; stroke-width:2.2; stroke-dasharray:7 9; animation:mmflow .9s linear infinite; }
   @media (prefers-reduced-motion:reduce){ .mm-link.flow{ animation:none; } }
+  #mimicOverlay.mm-full .mm-head, #mimicOverlay.mm-full .mm-card{ display:none; }
+  .mm-toast{ position:absolute; left:50%; bottom:calc(18px + env(safe-area-inset-bottom,0px)); transform:translateX(-50%); background:var(--panel-3); color:var(--text); border:1px solid var(--border); border-radius:999px; padding:7px 16px; font-family:var(--font-mono); font-size:12px; opacity:0; pointer-events:none; transition:opacity .25s; z-index:5; white-space:nowrap; }
+  .mm-toast.show{ opacity:1; }
+  /* ---------- V11_24: who's logging + last edited ---------- */
+  .userchip{ font-family:var(--font-mono); font-size:11.5px; max-width:150px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; padding:7px 10px; }
+  .userchip.unset{ border-color:var(--amber); color:var(--amber); }
+  .lastedit{ font-family:var(--font-mono); font-size:10.5px; color:var(--text-faint); margin-left:auto; white-space:nowrap; align-self:center; }
 </style>
 </head>
 <body>
@@ -1058,6 +1065,7 @@
       <button data-view="log" class="on">🖥 Logs</button>
       <button data-view="battery">🔋 Batteries</button>
     </div>
+    <button class="btn ghost userchip unset" id="btnUser" title="Who is logging on this device? (tap to change)">👤 Who?</button>
     <span class="savebadge" id="saveBadge">not saved yet</span>
     <div class="zoomctl">
       <button id="zoomOut" title="Zoom out">–</button>
@@ -2017,6 +2025,10 @@ function showTrendsModal(){
    for "who" without a real login system, so it's a shift-level
    record rather than a per-person one.
    ========================================================= */
+/* V11_24: who is logging on THIS device (kept outside STATE, so presets/backups never overwrite it) */
+const USER_KEY = "mups_user_v1";
+var CUR_USER = "";
+try{ CUR_USER = (window.localStorage.getItem(USER_KEY) || "").trim(); }catch(e){ /* ignore */ }
 const AUDIT_KEY = "ups_monitor_audit_v1";
 const AUDIT_MAX_ENTRIES = 400;
 function logAudit(roomKey, message){
@@ -2028,6 +2040,7 @@ function logAudit(roomKey, message){
     t: new Date().toISOString(),
     room: room ? room.label : (roomKey || "—"),
     who: room ? (room.dutyEngineers || "unassigned") : "—",
+    by: CUR_USER || "",
     msg: message
   });
   if(entries.length > AUDIT_MAX_ENTRIES) entries = entries.slice(-AUDIT_MAX_ENTRIES);
@@ -2041,7 +2054,7 @@ function showAuditLogModal(){
   const rowsHtml = entries.length ? entries.map(e=>`
     <div class="audit-row">
       <div class="audit-row-time">${new Date(e.t).toLocaleString()}</div>
-      <div class="audit-row-body"><b>${e.room}</b> — ${e.msg}<div class="audit-row-who">on duty: ${e.who}</div></div>
+      <div class="audit-row-body"><b>${e.room}</b> — ${e.msg}<div class="audit-row-who">${e.by ? "logged by <b>"+escH(e.by)+"</b> · " : ""}on duty: ${e.who}</div></div>
     </div>
   `).join("") : `<div class="tech-item-empty">No activity logged yet. Actions like adding/removing rows or rooms, saving presets, and clearing data will show up here.</div>`;
   const backdrop = document.createElement("div");
@@ -2391,6 +2404,7 @@ function renderRoom(roomKey){
   <div class="panel-toolbar no-print">
     <button type="button" class="collapse-toggle" onclick="toggleHeaderCollapsed()">${collapsed ? '\u25be Show room details' : '\u25b4 Hide room details'}</button>
     <button type="button" class="collapse-toggle" onclick="showThresholdModal('${roomKey}')" title="Customize alarm thresholds for this room">\u2699 Thresholds${room.thresholds ? ' (custom)' : ''}</button>
+    <span class="lastedit no-print" id="lastedit-${roomKey}">${lastEditText(room)}</span>
     ${collapsed ? `<span class="collapsed-summary">${room.location} \u00b7 ${room.date||'no date set'} \u00b7 ${room.time||'--:--'}</span>` : ''}
   </div>
   <div class="headerbar" style="${collapsed ? 'display:none;' : ''}">
@@ -3554,6 +3568,7 @@ document.getElementById("roomsHost").addEventListener("input", (e)=>{
   }
   setPath(STATE, parts, val);
   const roomKey = parts[0];
+  stampEdit(roomKey);                     // V11_24: who/when last edited this room
   autoOnInput(parts, val, el);            // V11_15: Input Current = Load % × 4, ambient/condition/display auto-fill
 
   const spec = el.getAttribute("data-spec");
@@ -3694,7 +3709,7 @@ function openClearAllConfirm(){
       logAudit(null, "Cleared all readings across every room.");
       ROOM_ORDER.forEach(k=>{
         const room = STATE[k];
-        room.date=""; room.time=""; room.remarks=""; room.ackBy="";
+        room.date=""; room.time=""; room.remarks=""; room.ackBy=""; room.editors=[]; room.lastBy=""; room.lastAt="";
         room.ups.forEach(u=>{
           u.iv=[null,null,null]; u.ov=[null,null,null]; u.lk=null; u.tl=null;
           u.upm=[null,null,null,null,null]; u.bv=null; u.rt=null; u.cc=null; u.rtemp=null;
@@ -5053,7 +5068,7 @@ function tplModels(){
       t1: t2f(rooms[0].checkTime1), t2: t2f(rooms[0].checkTime2),
       ups: rooms.flatMap(r=>r.ups.map((u,i)=>Object.assign({},u,{_ri:i}))),
       sts: rooms.flatMap(r=>r.sts).filter(s=>s.n||has(s)).map(s=>Object.assign({},s,{tf:t2f(s.time)})),
-      sig:(rooms.find(r=>r.ackSignature)||{}).ackSignature||null, remarks: uniq(rooms.map(r=>r.remarks)).join("  "), ack: uniq(rooms.map(r=>r.ackBy)).join(" / ") };
+      sig:(rooms.find(r=>r.ackSignature)||{}).ackSignature||null, remarks: uniq(rooms.map(r=>r.remarks)).join("  "), ack: uniq(rooms.map(r=>r.ackBy)).join(" / "), by: uniq(rooms.flatMap(r=>r.editors||[])).join(", ") };
   });
 }
 
@@ -5127,7 +5142,7 @@ function tplLayout(m){
   }
   let r=block(i0+1,"UPS",m.ups,true);
   r=block(r,"STS",m.sts,false);
-  C(r,1,"       REMARKS",HL,1,12); C(r,13,"Acknowledged by:",HL,1,7);
+  C(r,1,"       REMARKS",HL,1,7); C(r,8,m.by?("Logged by: "+m.by):"",HL,1,5); C(r,13,"Acknowledged by:",HL,1,7);
   C(r+1,1,m.remarks,{b:1,sz:10,al:"l",wrap:1},2,12); C(r+1,13,m.ack,{sz:9,al:"l"},2,7); if(m.sig) cells[cells.length-1].img=m.sig;
   return {cells, rows:r+2};
 }
@@ -5301,6 +5316,7 @@ function showExportChooser(){
    ========================================================= */
 document.getElementById("btnMoreTools").addEventListener("click", ()=>{
   const commonTail = [
+    { label: "👤 Who's logging: " + (CUR_USER || "not set"), onClick: ()=>{ openUserPicker(); } },
     { label: "☁ GitHub backup & sync", onClick: ()=>{ openGithubSync(); } },
     { label: "📨 Telegram bot" + (TG.alerts ? " (alerts on)" : ""), onClick: ()=>{ openTelegramSettings(); } },
     { label: "⚡ Power-path mimic", onClick: ()=>{ MIMIC.open(); } },
@@ -6067,7 +6083,7 @@ async function tgSendPdf(modeOverride){
     const fd = new FormData();
     fd.append("chat_id", TG.chat);
     if(TG.thread) fd.append("message_thread_id", TG.thread);
-    fd.append("caption", "MUPS Watch report — " + new Date().toLocaleString());
+    fd.append("caption", "MUPS Watch report — " + new Date().toLocaleString() + (CUR_USER ? " · sent by " + CUR_USER : ""));
     fd.append("document", new File([blob], pdfFilename(mode), { type:"application/pdf" }));
     await tgApi("sendDocument", fd);
     TG.lastError=""; tgSave();
@@ -6106,7 +6122,7 @@ function tgAlertFlush(){
     if(items.length) lines.push(room.label+" ("+(room.location||"")+")\n"+items.join("\n"));
   });
   if(!lines.length) return;
-  const text = "⚠️ MUPS Watch — out of spec\n" + new Date().toLocaleString() + "\n\n" + lines.join("\n\n");
+  const text = "⚠️ MUPS Watch — out of spec\n" + new Date().toLocaleString() + (CUR_USER ? " · logged by " + CUR_USER : "") + "\n\n" + lines.join("\n\n");
   tgSendText(text, true).catch(()=>{});
 }
 
@@ -6174,6 +6190,223 @@ function initTelegramBanner(){
 }
 initTelegramBanner();
 setTimeout(tgFlushQueue, 4000);
+
+/* =========================================================
+   WHO'S LOGGING + DEVELOPER-ONLY USAGE REPORTS (V11_24)
+   1) Each phone remembers which technician is logging. The name is
+      stamped on the room ("last edited by"), the activity log, the
+      PDF/Excel "Logged by" line and Telegram alerts.
+   2) Anonymous usage reports (device model, app version, which features
+      are used — NEVER readings) go by Telegram to the developer's own
+      private chat. Nothing is shown in the app except the hidden
+      developer panel (tap the app name 7 times).
+   ========================================================= */
+const APP_VERSION = "V11_24";
+
+/* >>> DEVELOPER: create a SEPARATE bot in @BotFather just for these reports,
+       press Start on it, then paste its token and your own chat ID here. <<<
+   Leave both empty to switch usage reports off. */
+const DEV_ANALYTICS = { token:"8831518472:AAF-Sx2DVW5NsiKbWzXmklw4dR2F5GwfYCY", chat:"8831518472" };
+
+/* ---------- who's logging ---------- */
+function updateUserChip(){
+  const b = document.getElementById("btnUser"); if(!b) return;
+  b.textContent = CUR_USER ? "👤 " + CUR_USER : "👤 Who?";
+  b.classList.toggle("unset", !CUR_USER);
+}
+function setCurUser(name){
+  CUR_USER = String(name||"").trim().slice(0,24);
+  try{ window.localStorage.setItem(USER_KEY, CUR_USER); }catch(e){ /* ignore */ }
+  updateUserChip();
+  try{ anTrack("user_set"); }catch(e){}
+}
+function lastEditText(room){
+  if(!room || !room.lastAt) return "";
+  const d = new Date(room.lastAt); if(isNaN(d)) return "";
+  return "✎ " + (room.lastBy ? room.lastBy + " · " : "") + d.toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"});
+}
+function stampEdit(roomKey){
+  const room = STATE && STATE[roomKey];
+  if(!room || typeof room !== "object" || !Array.isArray(room.ups)) return;
+  room.lastAt = new Date().toISOString();
+  if(CUR_USER){
+    room.lastBy = CUR_USER;
+    if(!Array.isArray(room.editors)) room.editors = [];
+    if(room.editors.indexOf(CUR_USER) < 0) room.editors.push(CUR_USER);
+  }
+  const el = document.getElementById("lastedit-" + roomKey);
+  if(el) el.textContent = lastEditText(room);
+  anCount("edits");
+}
+function openUserPicker(){
+  const roster = (STATE && STATE.techRoster && STATE.techRoster.length) ? STATE.techRoster : DEFAULT_TECH_ROSTER;
+  let close = ()=>{};
+  const actions = roster.map(n=>({
+    label: (n===CUR_USER ? "✓ " : "") + n, cls: n===CUR_USER ? "primary" : "ghost",
+    onClick: ()=>{ setCurUser(n); close(); showToast("✓ Logging as " + n, 1800); }
+  }));
+  actions.push({ label:"➕ My name isn't listed…", cls:"warn", onClick: ()=>{ close(); openNewUserForm(); } });
+  close = showModal("Who is logging on this device?",
+    "Your name is stamped on the readings you change, in the activity log, and as “Logged by” on the PDF/Excel report. Saved on this device only. The app also sends anonymous usage statistics (device model, app version, features used — never readings) to the app developer.",
+    actions);
+}
+function openNewUserForm(){
+  const body = '<div class="field-group"><label for="usr_new">Your name (e.g. R.SANTOS)</label><input class="cell-input" style="width:100%;text-align:left" id="usr_new" type="text" autocomplete="off" maxlength="24" placeholder="INITIAL.SURNAME"></div>';
+  showFormModal("Add your name", "", body, "Save & use this name", (bd, closeFn)=>{
+    const v = bd.querySelector("#usr_new").value.trim().toUpperCase();
+    const st = bd.querySelector(".modal-form-status");
+    if(!v){ if(st){ st.style.display=""; st.textContent="Type a name first."; st.style.color="var(--red)"; } return; }
+    if(!STATE.techRoster) STATE.techRoster = DEFAULT_TECH_ROSTER.slice();
+    if(STATE.techRoster.indexOf(v) < 0) STATE.techRoster.push(v);
+    setCurUser(v); scheduleSave(); closeFn(); renderAll(); showToast("✓ Logging as " + v, 1800);
+  });
+}
+window.openUserPicker = openUserPicker;
+document.getElementById("btnUser").addEventListener("click", openUserPicker);
+
+/* ---------- developer-only usage reports (to a private Telegram chat) ---------- */
+const AN_KEY = "mups_analytics_v1", AN_DEV_KEY = "mups_dev_cfg_v1", AN_MIN_GAP = 6*3600*1000;
+let AN = (function(){
+  const d = { id:"", first:0, opens:0, lastPing:0, feat:{}, since:{}, lastError:"" };
+  try{ const r = window.localStorage.getItem(AN_KEY); if(r) Object.assign(d, JSON.parse(r)); }catch(e){ /* ignore */ }
+  if(!d.id){ d.id = Math.random().toString(36).slice(2,6).toUpperCase() + "-" + Date.now().toString(36).slice(-4).toUpperCase(); d.first = Date.now(); }
+  return d;
+})();
+let anSaveT = null;
+function anSave(){ clearTimeout(anSaveT); anSaveT = setTimeout(()=>{ try{ window.localStorage.setItem(AN_KEY, JSON.stringify(AN)); }catch(e){} }, 1500); }
+function anCount(name){ AN.feat[name] = (AN.feat[name]||0) + 1; AN.since[name] = (AN.since[name]||0) + 1; anSave(); }
+function anTrack(name){ anCount(name); }
+window.anTrack = anTrack;
+function devCfg(){
+  let o = { token:DEV_ANALYTICS.token, chat:DEV_ANALYTICS.chat, local:false };
+  try{ const r = JSON.parse(window.localStorage.getItem(AN_DEV_KEY) || "null"); if(r && r.token && r.chat) o = { token:r.token, chat:r.chat, local:true }; }catch(e){}
+  return o;
+}
+async function anDeviceInfo(){
+  const ua = navigator.userAgent || "", info = { os:"Unknown", model:"", br:"Browser" };
+  let m = /Android\s([\d.]+)/.exec(ua);
+  if(m) info.os = "Android " + m[1];
+  else if(/iPhone|iPad|iPod/.test(ua)) info.os = "iOS";
+  else if(/Windows/.test(ua)) info.os = "Windows";
+  else if(/Mac OS/.test(ua)) info.os = "macOS";
+  else if(/Linux/.test(ua)) info.os = "Linux";
+  const mm = /;\s*([^;)]+?)\s+Build\//.exec(ua) || /Android[^;]*;\s*([^;)]+)\)/.exec(ua);
+  if(mm && mm[1] && mm[1] !== "K") info.model = mm[1].trim();
+  if(/SamsungBrowser\/([\d]+)/.test(ua)) info.br = "Samsung Internet " + RegExp.$1;
+  else if(/Telegram/i.test(ua) || window.TelegramWebviewProxy) info.br = "Telegram in-app browser";
+  else if(/EdgA?\/([\d]+)/.test(ua)) info.br = "Edge " + RegExp.$1;
+  else if(/Firefox\/([\d]+)/.test(ua)) info.br = "Firefox " + RegExp.$1;
+  else if(/Chrome\/([\d]+)/.test(ua)) info.br = (/\bwv\b/.test(ua) ? "Android WebView " : "Chrome ") + RegExp.$1;
+  else if(/Safari/.test(ua)) info.br = "Safari";
+  try{
+    const ud = navigator.userAgentData;
+    if(ud && ud.getHighEntropyValues){
+      const h = await ud.getHighEntropyValues(["model","platformVersion"]);
+      if(h.model) info.model = h.model;
+      if(h.platformVersion && /android/i.test(ud.platform||"")) info.os = "Android " + h.platformVersion.split(".")[0];
+    }
+  }catch(e){ /* not available — UA fallback above */ }
+  info.screen = (screen.width||"?") + "×" + (screen.height||"?") + " @" + (window.devicePixelRatio||1) + "x";
+  info.mode = (window.matchMedia && matchMedia("(display-mode: standalone)").matches) ? "installed app" : "browser tab";
+  info.net = (navigator.connection && navigator.connection.effectiveType) ? navigator.connection.effectiveType : "";
+  info.lang = navigator.language || "";
+  info.proto = location.protocol === "file:" ? "local file" : location.host;
+  return info;
+}
+async function anBuildMessage(kind){
+  const d = await anDeviceInfo();
+  const feats = Object.keys(AN.since).sort().map(k=>k + " ×" + AN.since[k]).join(", ") || "—";
+  return [
+    "📊 MUPS Watch — " + kind,
+    "Device: " + AN.id + (d.model ? " · " + d.model : ""),
+    d.os + " · " + d.br,
+    "Screen " + d.screen + " · " + d.mode + (d.net ? " · " + d.net : ""),
+    "App " + APP_VERSION + " · from " + d.proto + " · " + d.lang,
+    "Logging as: " + (CUR_USER || "not set"),
+    "Opens: " + AN.opens + " · first seen " + new Date(AN.first).toLocaleDateString(),
+    "Since last report: " + feats
+  ].join("\n");
+}
+async function anSend(kind){
+  const c = devCfg();
+  if(!c.token || !c.chat) return { ok:false, why:"not configured" };
+  if(!navigator.onLine) return { ok:false, why:"offline" };
+  const p = new URLSearchParams(); p.set("chat_id", c.chat); p.set("text", await anBuildMessage(kind)); p.set("disable_notification", "true");
+  const r = await fetch("https://api.telegram.org/bot" + c.token + "/sendMessage", { method:"POST", body:p });
+  let j = null; try{ j = await r.json(); }catch(e){}
+  if(!r.ok || !j || !j.ok){ AN.lastError = (j && j.description) || ("HTTP " + r.status); anSave(); return { ok:false, why:AN.lastError }; }
+  AN.lastPing = Date.now(); AN.since = {}; AN.lastError = ""; anSave();
+  try{ window.localStorage.setItem(AN_KEY, JSON.stringify(AN)); }catch(e){}
+  return { ok:true };
+}
+function anMaybePing(){
+  const c = devCfg(); if(!c.token || !c.chat) return;
+  if(AN.lastPing && Date.now() - AN.lastPing < AN_MIN_GAP) return;
+  anSend(AN.lastPing ? "usage report" : "new device").catch(()=>{});
+}
+
+/* feature counters: wrap the existing actions so nothing else has to change */
+(function(){
+  const wrap = (fn, tag)=> function(){ try{ anCount(tag); }catch(e){} return fn.apply(this, arguments); };
+  downloadPdfNow = wrap(downloadPdfNow, "pdf_export");
+  shareCurrentPdf = wrap(shareCurrentPdf, "pdf_share");
+  tgSendPdf = wrap(tgSendPdf, "telegram_pdf");
+  exportExcelTemplate = wrap(exportExcelTemplate, "excel_export");
+  exportCsv = wrap(exportCsv, "csv_export");
+  exportBackup = wrap(exportBackup, "backup_export");
+  openGithubSync = wrap(openGithubSync, "github_sync");
+  triggerAlarmAlert = wrap(triggerAlarmAlert, "alarm_out_of_spec");
+  const sv = setView; setView = function(v){ try{ anCount("view_" + v); }catch(e){} return sv.apply(this, arguments); };
+  document.getElementById("btnMimic").addEventListener("click", ()=>anCount("mimic"));
+})();
+
+/* ---------- hidden developer panel: tap the app name 7 times ---------- */
+function openDevPanel(){
+  const c = devCfg();
+  const lifetime = Object.keys(AN.feat).sort().map(k=>k + " ×" + AN.feat[k]).join(", ") || "—";
+  const dest = c.token && c.chat ? (c.local ? "local override on this device" : "built into the app file") : "NOT configured — reports are off";
+  const fld = (id,label,type,ph,val)=>'<div class="field-group"><label for="dv_'+id+'">'+label+'</label><input class="cell-input" style="width:100%;text-align:left" id="dv_'+id+'" type="'+type+'" placeholder="'+ph+'" value="'+escH(val)+'" autocomplete="off"></div>';
+  const body = '<div class="gh-note"><b>Device ID:</b> '+escH(AN.id)+'<br><b>Version:</b> '+APP_VERSION+'<br><b>Opens:</b> '+AN.opens+' · first seen '+escH(new Date(AN.first).toLocaleString())+'<br><b>Last report sent:</b> '+(AN.lastPing ? escH(new Date(AN.lastPing).toLocaleString()) : "never")+'<br><b>Destination:</b> '+dest+'<br><b>Lifetime use:</b> '+escH(lifetime)+(AN.lastError ? '<br><b>Last error:</b> '+escH(AN.lastError) : "")+'</div>'
+    + fld("token","Reports bot token (this device only — overrides the file)","password","123456:ABC…",c.local ? c.token : "")
+    + fld("chat","Your private chat ID","text","e.g. 123456789",c.local ? c.chat : "")
+    + '<div class="gh-actions"><button type="button" class="btn ghost" data-dv="save">💾 Save here</button><button type="button" class="btn" data-dv="test">📤 Send report now</button><button type="button" class="btn ghost" data-dv="clear">Clear local override</button></div>'
+    + '<div class="gh-note">Technicians never see this panel. Their phones only send a short report to YOUR chat at most every 6 hours (silent notification). To switch it on for everyone, paste the token and chat ID into <b>DEV_ANALYTICS</b> near the top of the V11_24 code block in the HTML file.</div>';
+  const { backdrop } = showFormModal("🛠 Developer panel", "Usage reports — visible only to you, in your Telegram chat.", body, "Close", (bd, closeFn)=>closeFn());
+  const status = (msg,bad)=>{ const el = backdrop.querySelector(".modal-form-status"); if(!el) return; el.style.display=""; el.textContent=msg; el.style.color = bad ? "var(--red)" : "var(--green)"; };
+  backdrop.addEventListener("click", async (e)=>{
+    const b = e.target.closest("[data-dv]"); if(!b) return; const a = b.getAttribute("data-dv");
+    const t = backdrop.querySelector("#dv_token").value.trim(), ch = backdrop.querySelector("#dv_chat").value.trim();
+    if(a==="clear"){ try{ window.localStorage.removeItem(AN_DEV_KEY); }catch(er){} status("Local override cleared.", false); return; }
+    if(t || ch){
+      if(!(/^\d+:[\w-]{20,}$/.test(t) && /^-?\d+$/.test(ch))){ status("Token looks like 123456:ABC… and the chat ID is a number.", true); return; }
+      try{ window.localStorage.setItem(AN_DEV_KEY, JSON.stringify({ token:t, chat:ch })); }catch(er){}
+    }
+    if(a==="save"){ status(t||ch ? "✓ Saved on this device." : "Nothing to save — paste a token and chat ID.", !(t||ch)); return; }
+    if(a==="test"){
+      status("Sending…", false);
+      try{ const r = await anSend("test report"); status(r.ok ? "✓ Sent — check your Telegram chat." : "Not sent: " + r.why, !r.ok); }
+      catch(er){ status("Not sent: " + er.message, true); }
+    }
+  });
+}
+window.openDevPanel = openDevPanel;
+(function(){
+  const brand = document.querySelector(".brand"); if(!brand) return;
+  let taps = 0, t0 = 0;
+  brand.addEventListener("click", ()=>{
+    const now = Date.now(); if(now - t0 > 4000) taps = 0; t0 = now; taps++;
+    if(taps >= 7){ taps = 0; openDevPanel(); }
+  });
+})();
+document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState === "hidden") anMaybePing(); });
+
+function userAndAnalyticsInit(){
+  updateUserChip();
+  AN.opens = (AN.opens||0) + 1;
+  try{ window.localStorage.setItem(AN_KEY, JSON.stringify(AN)); }catch(e){}
+  setTimeout(anMaybePing, 4000);
+  if(!CUR_USER) setTimeout(()=>{ if(!CUR_USER && !document.querySelector(".modal-backdrop")) openUserPicker(); }, 1200);   // first launch: ask who is logging
+}
 
 /* =========================================================
    LINKS & APP DOWNLOAD (V11_21)
@@ -6287,6 +6520,7 @@ window.openLinksManager = openLinksManager;
   updateCameraFabState();
   initReticleInteraction();
   refreshStatusDot();
+  userAndAnalyticsInit();     // V11_24: who's logging + usage report
   setView("dashboard");      // open on the health overview
   if(GH.remoteNewer) ghShowBanner();
   ghCheckRemote();           // V11_20: warn if GitHub has a newer backup; also arms auto-upload for unsent changes
@@ -6407,8 +6641,9 @@ const CRAC=[
 ];
 /* Data-center rooms that sit between the UPS panels and the CRAC panels on the drawings */
 const GROUPS=[];
-CRAC.forEach(c=>{ if(!GROUPS.some(g=>g.id===c.site&&g.side===c.side)) GROUPS.push({id:c.site,side:c.side,name:c.site.toUpperCase()}); });
+DC.forEach(d=>{ if(!GROUPS.some(g=>g.id===d.site&&g.side===d.side)) GROUPS.push({id:d.site,side:d.side,name:d.site.toUpperCase()}); });
 const groupOf=c=>GROUPS.find(g=>g.id===c.site&&g.side===c.side);
+const groupOfD=d=>GROUPS.find(g=>g.id===d.site&&g.side===d.side);
 const INP={};
 const setInp=(ids,src,mts)=>ids.forEach(i=>{ INP[i]={src:src,mts:!!mts}; });
 const UA_=n=>"MUPS-"+n+"A", UB_=n=>"MUPS-"+n+"B";
@@ -6444,12 +6679,12 @@ const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;"
 const mshort=id=>{const m=mdpById(id);return m?m.n:"?";};
 
 /* ---------- geometry (per side) ---------- */
-const W=1080;
+const W=1560;
 let H=975;
-const LVX=8,LVW=96,LVH=54, PXX=168,PW=34, TXX=216,TW=34, UX=262,UW=118,UH=40, MX=440,MW=176,MH=72, SX=744,SW=118,SH=28, LX=884;
+const LVX=8,LVW=96,LVH=54, PXX=168,PW=34, TXX=216,TW=34, UX=262,UW=118,UH=40, MX=440,MW=176,MH=72, SX=744,SW=118,SH=28, LX=884, GX=1075,GW=150, CX=1255, CLX=1415;
 const POS={};
 const UPSDEF={}; UPS.forEach(u=>UPSDEF[u.id]=u.mdp);
-let cracY0=0, mdpY=i=>62+i*118, stsY=i=>44+i*34, dcY=j=>0;
+let mdpY=i=>62+i*118, stsY=i=>44+i*34, dcY=j=>0;
 function layout(){
   Object.keys(POS).forEach(k=>delete POS[k]);
   const SM=bySide(MDP), SS=bySide(STS), SD=bySide(DC), SU=bySide(UPS), SL=bySide(LVSB);
@@ -6466,13 +6701,13 @@ function layout(){
     POS["L:"+l.id]={x:LVX,y:ys.reduce((a,b)=>a+b,0)/Math.max(1,ys.length),w:LVW,h:LVH}; });
   SS.forEach((s,i)=>{ POS["S:"+s.id]={x:SX,y:stsY(i),w:SW,h:SH}; });
   SD.forEach((d,j)=>{ POS["D:"+d.id]={x:SX,y:dcY(j),w:SW,h:SH}; });
-  const SC=bySide(CRAC); cracY0=Math.max(dcY(SD.length-1)+64, mdpY(SM.length-1)+MH/2+44);
-  SC.forEach((c,j)=>{ POS["C:"+c.id]={x:SX,y:cracY0+j*34,w:SW,h:SH}; });
-  bySide(GROUPS).forEach(g=>{ const ys=SC.filter(c=>c.site===g.id).map(c=>POS["C:"+c.id].y);
-    POS["G:"+g.id]={x:540,y:ys.reduce((a,b)=>a+b,0)/ys.length,w:170,h:30}; });
+  const SC=bySide(CRAC);
+  SC.forEach((c,j)=>{ POS["C:"+c.id]={x:CX,y:dcY(j),w:SW,h:SH}; });          // CRAC rows line up with the UPS-panel rows, as on the drawings
+  bySide(GROUPS).forEach(g=>{ const ys=SD.map((d,j)=>d.site===g.id?dcY(j):null).filter(v=>v!==null);
+    POS["G:"+g.id]={x:GX,y:ys.reduce((a,b)=>a+b,0)/ys.length,w:GW,h:Math.max(30,ys.length*34-6)}; });
   SL.filter(l=>l.crac).forEach(l=>{ const ys=SC.filter(c=>c.lvsb===l.id).map(c=>POS["C:"+c.id].y);
-    if(ys.length) POS["L:"+l.id]={x:LX+30,y:ys.reduce((a,b)=>a+b,0)/ys.length,w:LVW,h:30}; });
-  H=Math.max(cracY0+(SC.length-1)*34+50, mdpY(SM.length-1)+MH/2+60);
+    if(ys.length) POS["L:"+l.id]={x:CLX,y:ys.reduce((a,b)=>a+b,0)/ys.length,w:LVW,h:30}; });
+  H=Math.max(dcY(SD.length-1)+50, mdpY(SM.length-1)+MH/2+60);
 }
 
 function buildLinks(){
@@ -6492,6 +6727,8 @@ function buildLinks(){
     L.push({k:"c2",crac:c.id,lvsb:c.lvsb,c:c.c,x1:lp.x,y1:lp.y,x2:cp.x+cp.w,y2:cp.y}); });
   bySide(CRAC).forEach(c=>{ const g=groupOf(c), gp=POS["G:"+g.id], cp=POS["C:"+c.id];
     L.push({k:"g2c",crac:c.id,group:g.id,c:c.c,x1:gp.x+gp.w,y1:gp.y,x2:cp.x,y2:cp.y}); });
+  bySide(DC).forEach(d=>{ const g=groupOfD(d), dp=POS["D:"+d.id], gp=POS["G:"+g.id];
+    L.push({k:"d2g",dc:d.id,group:g.id,c:mdpById(d.mdp).c,x1:dp.x+dp.w,y1:dp.y,x2:gp.x,y2:dp.y}); });
   bySide(UPS).forEach(u=>{ const inp=INP[u.id]; if(inp&&inp.mts){ const tp=POS["T:"+u.id], up=POS["U:"+u.id];
     L.push({k:"t2u",ups:u.id,lvsb:inp.src[0],c:lvById(inp.src[0]).c,x1:tp.x+tp.w,y1:tp.y,x2:up.x,y2:up.y}); } });
   // UPS -> MDP
@@ -6565,7 +6802,7 @@ function computeStatus(){
 }
 
 /* ---------- selection / trace ---------- */
-let sel=null, zoom=980, editing=false;
+let sel=null, zoom=1250, editing=false;
 function trace(){
   const nodes=new Set(), on=new Set(), ctx=new Set(); const L=LINKS;
   if(!sel) return {nodes,on,ctx};
@@ -6581,18 +6818,20 @@ function trace(){
       if(l.mdp===mid&&(l.k==="m2s"||l.k==="m2d")){ on.add(i); nodes.add((l.sts?"S:"+l.sts:"D:"+l.dc)); }
     });
   };
+  const addDG=()=>L.forEach((l,i)=>{ if(l.k==="d2g"&&nodes.has("D:"+l.dc)){ on.add(i); nodes.add("G:"+l.group); } });
   const ctxOther=()=>L.forEach((l,i)=>{ if(l.k==="m2s"&&nodes.has("S:"+l.sts)&&!on.has(i)) ctx.add(i); });
-  if(sel.t==="U"||sel.t==="M"){ addMdp(sel.t==="U"?upsMdp(sel.id):sel.id); ctxOther(); }
+  if(sel.t==="U"||sel.t==="M"){ addMdp(sel.t==="U"?upsMdp(sel.id):sel.id); addDG(); ctxOther(); }
   else if(sel.t==="C"){ const c=CRAC.find(z=>z.id===sel.id); nodes.add("C:"+c.id); nodes.add("L:"+c.lvsb); nodes.add("G:"+groupOf(c).id);
     L.forEach((l,i)=>{ if((l.k==="c2"||l.k==="g2c")&&l.crac===c.id) on.add(i); }); }
   else if(sel.t==="G"){ nodes.add("G:"+sel.id);
     DC.filter(d=>d.site===sel.id).forEach(d=>nodes.add("D:"+d.id));
+    L.forEach((l,i)=>{ if(l.k==="d2g"&&l.group===sel.id) on.add(i); });
     CRAC.filter(c=>c.site===sel.id).forEach(c=>{ nodes.add("C:"+c.id); nodes.add("L:"+c.lvsb);
       L.forEach((l,i)=>{ if((l.k==="c2"||l.k==="g2c")&&l.crac===c.id) on.add(i); }); }); }
   else if(sel.t==="L"){ nodes.add("L:"+sel.id);
     bySide(CRAC).filter(c=>c.lvsb===sel.id).forEach(c=>{ nodes.add("C:"+c.id); nodes.add("G:"+groupOf(c).id); L.forEach((l,i)=>{ if((l.k==="c2"||l.k==="g2c")&&l.crac===c.id) on.add(i); }); });
     const mids=new Set(); bySide(UPS).forEach(u=>{ if(INP[u.id]&&INP[u.id].src.includes(sel.id)) mids.add(upsMdp(u.id)); });
-    mids.forEach(addMdp); ctxOther(); }
+    mids.forEach(addMdp); addDG(); ctxOther(); }
   else if(sel.t==="S"){
     nodes.add("S:"+sel.id);
     const x=stsSrc(STS.find(s=>s.id===sel.id));
@@ -6603,6 +6842,7 @@ function trace(){
     });
   } else if(sel.t==="D"){
     const d=DC.find(z=>z.id===sel.id); nodes.add("D:"+d.id); nodes.add("M:"+d.mdp); if(POS["G:"+d.site]) nodes.add("G:"+d.site);
+    L.forEach((l,i)=>{ if(l.k==="d2g"&&l.dc===d.id) on.add(i); });
     upsOfMdp(d.mdp).forEach(addInput);
     L.forEach((l,i)=>{ if((l.k==="m2d"&&l.dc===d.id)||(l.k==="u2m"&&l.mdp===d.mdp)) on.add(i); });
   }
@@ -6632,7 +6872,7 @@ function draw(){
   const T=trace(), has=!!sel;
   let s='<text class="mm-colhead" x="'+LVX+'" y="18">LVSB (INPUT)</text><text class="mm-colhead" x="'+PXX+'" y="18">PIU/MTS</text><text class="mm-colhead" x="'+UX+'" y="18">UPS</text><text class="mm-colhead" x="'+MX+'" y="18">MDP · UPS-SERVING STS PANEL ('+(side==="A"?"GA":"GB")+')</text>'
        +'<text class="mm-colhead" x="'+SX+'" y="18">STS</text><text class="mm-colhead" x="'+LX+'" y="18">SERVING LOAD (DP)</text>'
-       +'<text class="mm-colhead" x="'+SX+'" y="'+(dcY(0)-26)+'">DATA CENTER PANELS</text>';
+       +'<text class="mm-colhead" x="'+SX+'" y="'+(dcY(0)-26)+'">UPS PANELS · DATA CENTER</text>';
   // links
   let g="", dots="", tags="";
   LINKS.forEach((l,i)=>{
@@ -6652,20 +6892,22 @@ function draw(){
   bySide(LVSB).forEach(l=>{ if(POS["L:"+l.id]) s+=nodeSvg("L:"+l.id,cl("L:"+l.id),[l.id,l.loc]); });
   bySide(GROUPS).forEach(g=>{ s+=nodeSvg("G:"+g.id,cl("G:"+g.id),[g.name,"DATA CENTER"]); });
   bySide(CRAC).forEach(c=>{ s+=nodeSvg("C:"+c.id,cl("C:"+c.id),[c.name,c.tag]); });
-  s+='<text class="mm-colhead" x="540" y="'+(cracY0-26)+'">DATA CENTER</text><text class="mm-colhead" x="'+SX+'" y="'+(cracY0-26)+'">CRAC (AIR-CON)</text><text class="mm-colhead" x="'+(LX+30)+'" y="'+(cracY0-26)+'">LVSB (CRAC)</text>';
+  { const hy=dcY(0)-26; s+='<text class="mm-colhead" x="'+GX+'" y="'+hy+'">DATA CENTER</text><text class="mm-colhead" x="'+CX+'" y="'+hy+'">CRAC (AIR-CON)</text><text class="mm-colhead" x="'+CLX+'" y="'+hy+'">LVSB (CRAC)</text>'; }
   bySide(UPS).forEach(u=>{ const inp=INP[u.id]; if(!inp) return;
     inp.src.forEach((lid,j)=>{ s+=smallNode("P:"+u.id+":"+j,"PIU",cl("P:"+u.id+":"+j),T); });
     if(inp.mts) s+=smallNode("T:"+u.id,"MTS",cl("T:"+u.id),T); });
   bySide(UPS).forEach(u=>{ s+=nodeSvg("U:"+u.id,cl("U:"+u.id),[u.id,u.kva+" kVA · "+mshort(upsMdp(u.id))],T); });
   bySide(MDP).forEach(m=>{ s+=nodeSvg("M:"+m.id,cl("M:"+m.id),[m.pre,m.n,"UPS ROOM "+m.room],T); });
-  const load=(p,dp,sub,dim,warn)=>{ const o=dim?.3:1;
+  const load=(p,dp,sub,dim,warn,noline)=>{ const o=dim?.3:1;
+    if(noline) return '<text class="mm-load" style="opacity:'+o+'" x="'+LX+'" y="'+(p.y-4)+'">'+esc(dp)+'</text>'
+      +'<text class="mm-load" style="opacity:'+(o*.75)+';font-size:8.5px" x="'+LX+'" y="'+(p.y+12)+'">'+esc(sub)+'</text>';
     return '<line x1="'+(p.x+p.w)+'" y1="'+p.y+'" x2="'+(LX-6)+'" y2="'+p.y+'" stroke="var(--text-faint)" stroke-width="1.6" style="opacity:'+o+'"/>'
       +'<text class="mm-load" style="opacity:'+o+'" x="'+LX+'" y="'+(p.y-1)+'">'+esc(dp)+(warn?" ⚠":"")+'</text>'
       +'<text class="mm-load" style="opacity:'+(o*.75)+';font-size:8.5px" x="'+LX+'" y="'+(p.y+10)+'">'+esc(sub)+'</text>'; };
   bySide(STS).forEach(t=>{ s+=nodeSvg("S:"+t.id,cl("S:"+t.id),[t.id+"  "+t.amps+"A"],T);
     s+=load(POS["S:"+t.id],t.dp,t.zone,has&&!T.nodes.has("S:"+t.id),!stsSrc(t).ok); });
   bySide(DC).forEach(d=>{ s+=nodeSvg("D:"+d.id,cl("D:"+d.id),[d.name]);
-    s+=load(POS["D:"+d.id],d.dp,d.site,has&&!T.nodes.has("D:"+d.id),false); });
+    s+=load(POS["D:"+d.id],d.dp,d.site,has&&!T.nodes.has("D:"+d.id),false,true); });
   const svg=document.getElementById("mmSvg");
   svg.setAttribute("viewBox","0 0 "+W+" "+H); svg.innerHTML=s; svg.style.width=zoom+"px";
   document.querySelectorAll(".mm-side").forEach(b=>b.classList.toggle("on",b.dataset.side===side));
@@ -6693,7 +6935,7 @@ function drawCard(){
   if(!sel){
     const unv=bySide(STS).filter(s=>!stsSrc(s).ok).length, tot=bySide(STS).length;
     c.innerHTML='<h3>'+(side==="A"?"Group-A":"Group-B")+' · tap any equipment to trace its power path</h3>'
-      +'<div class="sub">UPS → MDP → STS / data-center panels. Selected path animates; the dotted lines show the other source of each STS. Each STS is wired straight to the serving-load DP written beside it.</div>'
+      +'<div class="sub">UPS → MDP → STS / data-center panels. Selected path animates; the dotted lines show the other source of each STS. Each STS is wired straight to the serving-load DP written beside it. Double-tap the diagram for full screen, double-tap again to return.</div>'
       +'<div class="mm-legend"><span><i style="border-top-style:solid"></i>S1 / feed</span><span><i style="border-top-style:dashed"></i>other source</span>'
       +'<span style="color:var(--green)">● in spec</span><span style="color:var(--red)">▲ out of spec</span><span style="color:var(--amber)">◆ advisory</span><span>○ no reading</span></div>'
       +(unv?'<div class="mm-row"><span class="mm-pill draft">⚠ '+unv+' of '+tot+' STS source assignments are still DRAFT</span></div><div class="sub">Confirm each against the as-built and tick “Verified” in its Edit panel. Nodes without a ⚠ are confirmed.</div>':"");
@@ -6728,8 +6970,8 @@ function drawCard(){
     const lvs=[...new Set(cr.map(c=>c.lvsb))];
     h+='<h3>'+esc(g.name)+'</h3><div class="sub">Data-center room · UPS-backed panels and CRAC (air-con) panels</div>';
     h+='<div class="mm-row"><b>UPS panels</b>'+dcs.map(d=>chip("D",d.id,d.name)).join("")+'</div>';
-    h+='<div class="mm-row"><b>CRAC panels</b>'+cr.map(c=>chip("C",c.id,c.name)).join("")+'</div>';
-    h+='<div class="mm-row"><b>CRAC fed from</b>'+lvs.map(l=>chip("L",l,l+" ("+lvById(l).loc+")")).join("")+'</div>';
+    h+='<div class="mm-row"><b>CRAC panels</b>'+(cr.length?cr.map(c=>chip("C",c.id,c.name)).join(""):'<span style="color:var(--text-dim)">none on the drawing</span>')+'</div>';
+    if(lvs.length) h+='<div class="mm-row"><b>CRAC fed from</b>'+lvs.map(l=>chip("L",l,l+" ("+lvById(l).loc+")")).join("")+'</div>';
   } else if(sel.t==="C"){
     const c=CRAC.find(z=>z.id===sel.id), lv=lvById(c.lvsb);
     h+='<h3>'+esc(c.name)+'</h3><div class="sub">'+esc(c.site)+' · air-conditioning normal power supply</div>';
@@ -6757,6 +6999,7 @@ function drawCard(){
   } else if(sel.t==="D"){
     const d=DC.find(x=>x.id===sel.id);
     h+='<h3>'+esc(d.name)+' '+pill(ST["D:"+d.id].st)+'</h3><div class="sub">'+esc(d.dp)+' · '+esc(d.site)+'</div>';
+    h+='<div class="mm-row"><b>Data center</b>'+chip("G",groupOfD(d).id,groupOfD(d).name)+'</div>';
     h+='<div class="mm-row"><b>Fed from</b>'+mdpChips(d.mdp)+'</div><div class="mm-row"><b>UPS behind it</b>'+upsOfMdp(d.mdp).map(u=>chip("U",u)).join("")+'</div>';
   }
   c.innerHTML=h;
@@ -6813,10 +7056,15 @@ function build(){
     +'<button class="btn ghost" id="mmZm" title="Zoom out">–</button><button class="btn ghost" id="mmZp" title="Zoom in">+</button>'
     +'<button class="btn ghost" id="mmClr">Clear</button><button class="btn primary" id="mmX">✕ Close</button></div>'
     +'<div class="mm-wrap" id="mmWrap"><svg id="mmSvg" viewBox="0 0 '+W+' '+H+'" xmlns="'+"http://www.w3.org/2000/svg"+'"></svg></div>'
-    +'<div class="mm-card" id="mmCard"></div>';
+    +'<div class="mm-card" id="mmCard"></div><div class="mm-toast" id="mmToast"></div>';
   document.body.appendChild(o);
   const $=id=>document.getElementById(id);
   $("mmX").onclick=close;
+  (function(){ const wrap=$("mmWrap"); let lt=0,lx=0,ly=0;
+    wrap.addEventListener("pointerup",e=>{ const n=Date.now();
+      if(n-lt<340&&Math.abs(e.clientX-lx)<30&&Math.abs(e.clientY-ly)<30){ lt=0; toggleFull(); } else { lt=n; lx=e.clientX; ly=e.clientY; } });
+    document.addEventListener("fullscreenchange",()=>{ if(!document.fullscreenElement&&o.classList.contains("mm-full")) setFull(false,true); });
+  })();
   o.querySelectorAll(".mm-side").forEach(b=>b.onclick=()=>{ side=b.dataset.side; sel=null; editing=false; $("mmJump").value=""; draw(); $("mmWrap").scrollTo({left:0,top:0}); });
   $("mmClr").onclick=()=>{ sel=null; editing=false; $("mmJump").value=""; draw(); };
   $("mmZp").onclick=()=>{ zoom=Math.min(1600,zoom+140); draw(); };
@@ -6868,7 +7116,16 @@ function open(name){
     document.getElementById("mmCard").insertAdjacentHTML("afterbegin",'<div class="mm-row"><span class="mm-pill warn">“'+esc(name)+'” is not on the Group-A / Group-B drawings.</span></div>');
   }
 }
+function toast(t){ const el=document.getElementById("mmToast"); if(!el) return; el.textContent=t; el.classList.add("show"); clearTimeout(toast._t); toast._t=setTimeout(()=>el.classList.remove("show"),1900); }
+function setFull(on,fromSystem){
+  const o=document.getElementById("mimicOverlay"); if(!o) return;
+  o.classList.toggle("mm-full",on);
+  try{ if(on&&o.requestFullscreen) o.requestFullscreen().catch(()=>{}); else if(!on&&!fromSystem&&document.fullscreenElement) document.exitFullscreen().catch(()=>{}); }catch(e){}
+  toast(on?"Full screen · double-tap to return":"Back to normal view");
+}
+function toggleFull(){ const o=document.getElementById("mimicOverlay"); setFull(!o.classList.contains("mm-full")); }
 function close(){
+  setFull(false);
   const o=document.getElementById("mimicOverlay"); if(o) o.classList.remove("open");
   document.body.style.overflow="";
 }
