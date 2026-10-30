@@ -1048,6 +1048,16 @@
   .userchip.unset{ border-color:var(--amber); color:var(--amber); }
   /* ---------- V11_25: PMS ---------- */
   .arow-main .pms-overdue{ color:var(--red); font-weight:700; } .arow-main .pms-today, .arow-main .pms-soon{ color:var(--amber); font-weight:700; }
+  .pmschip{ font:600 9.5px var(--font-mono); padding:2px 5px; margin-left:4px; border-radius:4px; border:1px solid var(--border-soft); background:transparent; color:var(--text-dim); cursor:pointer; white-space:nowrap; flex:none; }
+  .pmschip:hover{ border-color:var(--text-faint); } .pmschip.pms-overdue{ color:var(--red); border-color:var(--red); } .pmschip.pms-today, .pmschip.pms-soon{ color:var(--amber); border-color:var(--amber); }
+  .pmsind{ position:relative; display:inline-flex; flex-direction:column; align-items:center; justify-content:center; width:34px; height:34px; padding:0; border-radius:8px; border:1px solid var(--border); background:var(--panel-2); color:var(--text-faint); cursor:pointer; line-height:1; flex:none; }
+  .pmsind .pi{ font-size:14px; } .pmsind .pw{ font:700 7px var(--font-mono); letter-spacing:.7px; margin-top:2px; }
+  .pmsind .pn{ position:absolute; top:-5px; right:-5px; min-width:14px; height:14px; padding:0 3px; border-radius:7px; background:var(--red); color:#fff; font:700 9px/14px var(--font-mono); text-align:center; display:none; }
+  .pmsind.ok{ color:var(--green); border-color:var(--green); background:rgba(51,214,144,.08); }
+  .pmsind.due{ color:var(--red); border-color:var(--red); background:rgba(255,93,108,.12); animation:pmsblink 1.1s ease-in-out infinite; }
+  .pmsind.due .pn{ display:block; }
+  @keyframes pmsblink{ 0%,100%{ box-shadow:0 0 0 0 rgba(255,93,108,.65); opacity:1; } 50%{ box-shadow:0 0 0 5px rgba(255,93,108,0); opacity:.55; } }
+  @media (prefers-reduced-motion: reduce){ .pmsind.due{ animation:none; } }
   .pms-btns{ display:flex; gap:4px; flex:none; } .pms-btns .btn{ min-height:36px; padding:4px 9px; }
   .pms-mini{ display:inline-flex; align-items:center; justify-content:center; min-width:36px; min-height:36px; text-decoration:none; }
   .lastedit{ font-family:var(--font-mono); font-size:10.5px; color:var(--text-faint); margin-left:auto; white-space:nowrap; align-self:center; }
@@ -1069,6 +1079,7 @@
       <button data-view="log" class="on">🖥 Logs</button>
       <button data-view="battery">🔋 Batteries</button>
     </div>
+    <button class="pmsind none no-print" id="btnPms" title="PMS schedule — no dates set yet" aria-label="PMS schedule"><span class="pi">🛠</span><span class="pw">PMS</span><span class="pn" id="pmsCount0">0</span></button>
     <button class="btn ghost userchip unset" id="btnUser" title="Who is logging on this device? (tap to change)">👤 Who?</button>
     <span class="savebadge" id="saveBadge">not saved yet</span>
     <div class="zoomctl">
@@ -5283,10 +5294,70 @@ document.getElementById("zoomOut").addEventListener("click", ()=>{ ZOOM = Math.m
    Hosting it as a static site (e.g. GitHub Pages, Netlify — both
    free) is what unlocks this; see the chat for details.
    ========================================================= */
+/* =========================================================
+   APP ICON (V11_28) — the home-screen icon and the Android launch splash
+   come from the web-app manifest. A modern icon is drawn here from the
+   SAME APSI geometry as the original logo; the original embedded logo is
+   kept untouched and can be switched back to at any time (More → App icon).
+   ========================================================= */
+const ICON_KEY = "mups_icon_style_v1";
+function mupsIconStyle(){ try{ return window.localStorage.getItem(ICON_KEY) === "original" ? "original" : "modern"; }catch(e){ return "modern"; } }
+function mupsIconDraw(size, full){
+  const cv = document.createElement("canvas"); cv.width = cv.height = size;
+  const g = cv.getContext("2d"), k = size/200; g.scale(k, k);
+  const tile = ()=>{ g.beginPath(); if(full){ g.rect(0,0,200,200); } else { const r=44; g.moveTo(r,0); g.arcTo(200,0,200,200,r); g.arcTo(200,200,0,200,r); g.arcTo(0,200,0,0,r); g.arcTo(0,0,200,0,r); g.closePath(); } };
+  tile(); const bg = g.createLinearGradient(0,0,200,200); bg.addColorStop(0,"#17305A"); bg.addColorStop(.55,"#0C1727"); bg.addColorStop(1,"#070B12"); g.fillStyle = bg; g.fill();
+  g.save(); tile(); g.clip();
+  const gl = g.createRadialGradient(100,70,4,100,70,96); gl.addColorStop(0,"rgba(76,134,255,.42)"); gl.addColorStop(1,"rgba(76,134,255,0)"); g.fillStyle = gl; g.fillRect(0,0,200,200);
+  const sh = g.createLinearGradient(0,0,0,90); sh.addColorStop(0,"rgba(255,255,255,.11)"); sh.addColorStop(1,"rgba(255,255,255,0)"); g.fillStyle = sh; g.fillRect(0,0,200,90);
+  g.restore();
+  /* APSI mark — same shapes as the original logo, with gradients and softened corners */
+  g.save(); g.translate(100,24); g.scale(.58,.58); g.translate(-100,-6); g.lineJoin = "round";
+  const tri = (a,b,c)=>{ g.beginPath(); g.moveTo(a[0],a[1]); g.lineTo(b[0],b[1]); g.lineTo(c[0],c[1]); g.closePath(); };
+  const bl = g.createLinearGradient(100,6,100,150); bl.addColorStop(0,"#5A92FF"); bl.addColorStop(1,"#1D45A8");
+  g.shadowColor = "rgba(70,125,255,.55)"; g.shadowBlur = 16*k;
+  g.fillStyle = bl; g.strokeStyle = bl; g.lineWidth = 9; tri([100,6],[191.3,150],[8.7,150]); g.fill(); g.stroke();
+  g.shadowBlur = 0;
+  const yl = g.createLinearGradient(100,35,100,141); yl.addColorStop(0,"#FFF47A"); yl.addColorStop(1,"#F2C21B");
+  g.fillStyle = yl; g.strokeStyle = yl; g.lineWidth = 5; tri([100,35],[167.2,141],[32.8,141]); g.fill(); g.stroke();
+  g.fillStyle = "#1D45A8"; g.fillRect(61,116,115,13); g.fillRect(76,101,17,16);
+  g.restore();
+  /* wordmark */
+  g.textBaseline = "alphabetic"; g.fillStyle = "#F2F6FF"; g.font = '900 31px "Arial Black", Arial, Helvetica, sans-serif';
+  const L = ["A","P","S","I"], ws = L.map(c=>g.measureText(c).width), tot = 98, gap = (tot - ws.reduce((a,b)=>a+b,0)) / 3; let x = 100 - tot/2;
+  L.forEach((c,i)=>{ g.fillText(c, x, 150); x += ws[i] + gap; });
+  /* monitoring pulse */
+  g.strokeStyle = "#33D690"; g.lineWidth = 3.6; g.lineCap = "round"; g.lineJoin = "round"; g.shadowColor = "rgba(51,214,144,.7)"; g.shadowBlur = 8*k;
+  g.beginPath(); g.moveTo(44,172); g.lineTo(78,172); g.lineTo(86,161); g.lineTo(96,184); g.lineTo(104,166); g.lineTo(110,172); g.lineTo(156,172); g.stroke();
+  return cv.toDataURL("image/png");
+}
+function openIconPicker(){
+  const cur = mupsIconStyle(), logo = document.querySelector(".room-logo"), orig = logo ? logo.src : "";
+  const fig = (src,label,bgc)=>`<div style="text-align:center"><img src="${src}" width="96" height="96" alt="${label}" style="border-radius:22px;object-fit:contain;background:${bgc}"><div style="font:600 11px var(--font-mono);margin-top:4px">${label}</div></div>`;
+  let close = ()=>{};
+  const pick = (style)=>{ try{ window.localStorage.setItem(ICON_KEY, style); }catch(e){} setupPWA(); try{ anCount("icon_"+style); }catch(e){} close();
+    showInfoModal("App icon: " + (style==="modern" ? "Modern" : "Original"), "Saved. The home-screen icon and the Android launch splash are fixed when the app is installed, so to see the change: remove the app from your home screen, then open the page in Chrome and choose <b>Add to Home screen</b> again."); };
+  close = showModal("App icon", `<div style="display:flex;gap:22px;justify-content:center;margin:8px 0 12px">${fig(mupsIconDraw(192,false),"Modern","transparent")}${fig(orig,"Original","#fff")}</div>Both are kept — you can switch back any time. Currently using: <b>${cur==="modern"?"Modern":"Original"}</b>.`, [
+    { label:(cur==="modern"?"✓ ":"")+"Use modern icon", cls:cur==="modern"?"primary":"ghost", onClick:()=>pick("modern") },
+    { label:(cur==="original"?"✓ ":"")+"Use original icon", cls:cur==="original"?"primary":"ghost", onClick:()=>pick("original") }
+  ]);
+}
+window.openIconPicker = openIconPicker;
+
 function setupPWA(){
   try{
     const logoImg = document.querySelector(".room-logo");
-    const iconSrc = logoImg ? logoImg.src : "";
+    const origSrc = logoImg ? logoImg.src : "";
+    const modern = mupsIconStyle() === "modern";
+    const iconSrc = modern ? mupsIconDraw(180, true) : origSrc;
+    const icons = modern ? [
+      { src: mupsIconDraw(192,false), sizes: "192x192", type: "image/png", purpose: "any" },
+      { src: mupsIconDraw(512,false), sizes: "512x512", type: "image/png", purpose: "any" },
+      { src: mupsIconDraw(512,true),  sizes: "512x512", type: "image/png", purpose: "maskable" }
+    ] : (origSrc ? [
+      { src: origSrc, sizes: "192x192", type: "image/png", purpose: "any" },
+      { src: origSrc, sizes: "192x192", type: "image/png", purpose: "maskable" }
+    ] : []);
     const manifest = {
       name: "MUPS Watch — UPS & STS Monitoring Log",
       short_name: "MUPS Watch",
@@ -5296,16 +5367,16 @@ function setupPWA(){
       orientation: "any",
       background_color: "#0A0E13",
       theme_color: "#0A0E13",
-      icons: iconSrc ? [
-        { src: iconSrc, sizes: "192x192", type: "image/png", purpose: "any" },
-        { src: iconSrc, sizes: "192x192", type: "image/png", purpose: "maskable" }
-      ] : []
+      icons: icons
     };
     const manifestUrl = URL.createObjectURL(new Blob([JSON.stringify(manifest)], {type:"application/manifest+json"}));
     const link = document.getElementById("pwaManifestLink");
     if(link) link.href = manifestUrl;
     const appleIcon = document.getElementById("pwaAppleIcon");
     if(appleIcon && iconSrc) appleIcon.href = iconSrc;
+    let fav = document.getElementById("pwaFavicon");
+    if(!fav){ fav = document.createElement("link"); fav.id = "pwaFavicon"; fav.rel = "icon"; document.head.appendChild(fav); }
+    if(modern) fav.href = mupsIconDraw(64, false);
   }catch(e){ /* progressive enhancement only — never block the app on this */ }
 }
 
@@ -5583,11 +5654,13 @@ function showExportChooser(){
    ========================================================= */
 document.getElementById("btnMoreTools").addEventListener("click", ()=>{
   const commonTail = [
+    { label: "🎨 App icon (modern / original)", onClick: ()=>{ openIconPicker(); } },
     { label: "👤 Who's logging: " + (CUR_USER || "not set"), onClick: ()=>{ openUserPicker(); } },
     { label: "☁ GitHub backup & sync", onClick: ()=>{ openGithubSync(); } },
     { label: "📨 Telegram bot" + (TG.alerts ? " (alerts on)" : ""), onClick: ()=>{ openTelegramSettings(); } },
     { label: "⚡ Power-path mimic", onClick: ()=>{ MIMIC.open(); } },
     { label: "🛠 PMS schedule (preventive maintenance)", onClick: ()=>{ showPmsSchedule(); } },
+    { label: "⬇ Apply PMS plan from Excel", onClick: ()=>{ pmsAskApply(); } },
     { label: "🗂 UPS & STS unit details", onClick: ()=>{ showAssetRegister(); } },
     { label: "📖 Help & user guide", onClick: ()=>{ showHelpGuide(); } },
     { divider:true },
@@ -5844,6 +5917,7 @@ function openAssetEditor(unitName, roomKey, section){
       <div class="field-group"><label for="as_pmsFreq">Frequency</label><select class="cell-input" style="width:100%;text-align:left" id="as_pmsFreq">${Object.keys(PMS_FREQ).map(k=>`<option value="${k}" ${(a.pmsFreq||"monthly")===k?"selected":""}>${PMS_FREQ[k].label}</option>`).join("")}</select></div>
       <div class="field-group"><label for="as_pmsType">Type</label><select class="cell-input" style="width:100%;text-align:left" id="as_pmsType"><option value="non-intrusive" ${(a.pmsType||"non-intrusive")==="non-intrusive"?"selected":""}>Non-intrusive</option><option value="intrusive" ${a.pmsType==="intrusive"?"selected":""}>Intrusive</option></select></div>
       <div class="field-group"><label>Battery testing</label><label style="display:flex;align-items:center;gap:8px;margin:0;font:13px var(--font-body);text-transform:none;letter-spacing:0;color:var(--text);min-height:30px"><input type="checkbox" id="as_pmsBatt" ${a.pmsBatt?"checked":""} style="width:22px;height:22px"> included in this PMS</label></div>
+      <div class="field-group"><label for="as_pmsAnnual">Annual PMS month (marked “A”)</label><select class="cell-input" style="width:100%;text-align:left" id="as_pmsAnnual"><option value="0">— none —</option>${["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"].map((m,i)=>`<option value="${i+1}" ${(+a.pmsAnnual||0)===i+1?"selected":""}>${m}</option>`).join("")}</select></div>
       ${fld("pmsMop","MOP (method of procedure) link","url","https://… (optional)",a.pmsMop,'inputmode="url" autocomplete="off"',"full")}
       <div class="field-group full"><div class="gh-note" id="pmsStatus" style="margin:0 0 8px"></div>
         <div class="asset-links no-print" style="margin:0"><button type="button" class="btn ghost" data-pms="done">✔ Done today — roll to next due</button><button type="button" class="btn ghost" data-pms="mop">📋 Open MOP</button>${roomKey && section ? `<button type="button" class="btn ghost" data-pms="apply">⧉ Copy PMS settings to the other units in this room</button>` : ""}</div></div>
@@ -5860,7 +5934,8 @@ function openAssetEditor(unitName, roomKey, section){
     const v = id => bd.querySelector("#as_"+id).value.trim();
     const rec = { brand:v("brand"), model:v("model"), sn:v("sn"), ip:v("ip"), installed:v("installed"), warranty:v("warranty"), manual:normUrl(v("manual")), site:normUrl(v("site")), notes:v("notes"),
       pmsDue:v("pmsDue"), pmsFreq:v("pmsFreq"), pmsType:v("pmsType"), pmsBatt:bd.querySelector("#as_pmsBatt").checked, pmsMop:normUrl(v("pmsMop")),
-      pmsLast: pendingDone ? pendingDone.date : (a.pmsLast||""), pmsLastBy: pendingDone ? pendingDone.by : (a.pmsLastBy||"") };
+      pmsLast: pendingDone ? pendingDone.date : (a.pmsLast||""), pmsLastBy: pendingDone ? pendingDone.by : (a.pmsLastBy||""),
+      pmsAnnual: +pq("pmsAnnual").value || 0, pmsMD: a.pmsMD || undefined, pmsMD26: a.pmsMD26 || undefined };
     if(!rec.pmsDue && !rec.pmsMop && !rec.pmsBatt && !rec.pmsLast){ rec.pmsFreq = ""; rec.pmsType = ""; }
     const err = readErr(rec); if(err){ status(bd, err, true); return; }
     if(ASSET_FIELDS.every(f=>!rec[f]) && !rec.pmsBatt && !rec.pmsLast) delete ASSETS[key]; else { rec.updated = new Date().toISOString(); ASSETS[key] = rec; }
@@ -5875,7 +5950,7 @@ function openAssetEditor(unitName, roomKey, section){
   backdrop.addEventListener("click",(e)=>{
     const b = e.target.closest("[data-pms]"); if(!b) return; const act = b.getAttribute("data-pms");
     if(act==="done"){
-      pq("pmsDue").value = pmsNextDue(pq("pmsDue").value, pq("pmsFreq").value);
+      pq("pmsDue").value = pmsNextDue(pq("pmsDue").value, pq("pmsFreq").value, a);
       pendingDone = { date: pmsToday(), by: CUR_USER || "" }; pmsRefresh();
       status(backdrop, "Marked done today — next due " + pq("pmsDue").value + ". Tap “Save details” to keep it.", false);
     } else if(act==="mop"){
@@ -5979,8 +6054,23 @@ function pmsAddMonths(ds, n){
   let y = +m[1], mo = +m[2]-1+n, d = +m[3]; y += Math.floor(mo/12); mo = ((mo%12)+12)%12;
   d = Math.min(d, new Date(y, mo+1, 0).getDate()); return y+"-"+pmsPad(mo+1)+"-"+pmsPad(d);
 }
-function pmsNextDue(due, freq){
-  const n = (PMS_FREQ[freq]||PMS_FREQ.monthly).m, today = pmsToday();
+/* plan dates (from the Excel): 2026 uses the explicit dates when the unit has them, every other year repeats the 2027 month/day */
+function pmsPlanDates(a, year){
+  const out = [];
+  const ex = (year===2026 && a.pmsMD26 && Object.keys(a.pmsMD26).length) ? Object.keys(a.pmsMD26).map(k=>a.pmsMD26[k]) : (a.pmsMD || []);
+  ex.forEach(md=>{ const m = /^(\d\d)-(\d\d)$/.exec(md||""); if(!m) return; const mo = +m[1]; out.push(year+"-"+pmsPad(mo)+"-"+pmsPad(Math.min(+m[2], new Date(year, mo, 0).getDate()))); });
+  return out.sort();
+}
+function pmsPlanNext(a, after, inclusive){
+  if(!a || !(a.pmsMD||[]).some(Boolean)) return "";
+  const y0 = +after.slice(0,4);
+  for(let y=y0; y<=y0+2; y++){ const hit = pmsPlanDates(a,y).find(d=> inclusive ? d>=after : d>after); if(hit) return hit; }
+  return "";
+}
+function pmsNextDue(due, freq, a){
+  const today = pmsToday();
+  if(a && (a.pmsMD||[]).some(Boolean)){ const hit = pmsPlanNext(a, (due && due > today) ? due : today, false); if(hit) return hit; }
+  const n = (PMS_FREQ[freq]||PMS_FREQ.monthly).m;
   let nx = pmsAddMonths(due || today, n), g = 0; while(nx <= today && g++ < 60) nx = pmsAddMonths(nx, n);
   return nx;
 }
@@ -5989,12 +6079,13 @@ function pmsInfo(a){
   return { d, state: d<0 ? "overdue" : d===0 ? "today" : d<=PMS_REMIND_DAYS ? "soon" : "ok",
            txt: d<0 ? "overdue "+(-d)+" d" : d===0 ? "due today" : "due in "+d+" d" };
 }
-function pmsTags(a){
-  return [ (PMS_FREQ[a.pmsFreq]||PMS_FREQ.monthly).label, a.pmsType==="intrusive" ? "Intrusive" : "Non-intrusive", a.pmsBatt ? "🔋 battery test" : "" ].filter(Boolean).join(" · ");
+function pmsTags(a, due){
+  const isAnnual = !!(due && a.pmsAnnual && +due.slice(0,4) >= 2027 && +due.slice(5,7) === +a.pmsAnnual);   // the Excel marks “A” from 2027 on
+  return [ isAnnual ? "ANNUAL PMS" : (PMS_FREQ[a.pmsFreq]||PMS_FREQ.monthly).label, a.pmsType==="intrusive" ? "Intrusive" : "Non-intrusive", a.pmsBatt ? "🔋 battery test" : "" ].filter(Boolean).join(" · ");
 }
 function pmsLineHtml(a){
   const i = pmsInfo(a); if(!i) return "";
-  return `<span class="adesc pms-${i.state}">🛠 PMS ${escH(a.pmsDue)} · ${i.txt} · ${escH(pmsTags(a))}</span>`;
+  return `<span class="adesc pms-${i.state}">🛠 PMS ${escH(a.pmsDue)} · ${i.txt} · ${escH(pmsTags(a, a.pmsDue))}</span>`;
 }
 function pmsStatusHtml(due, last, by){
   const d = pmsDays(due); let s;
@@ -6008,17 +6099,19 @@ function pmsDueList(){
   allUnits().forEach(u=>{ const a = getAsset(u.name); const i = pmsInfo(a); if(i && i.d <= PMS_REMIND_DAYS) out.push({u, a, i}); });
   return out.sort((x,y)=>x.i.d - y.i.d);
 }
+function pmsIndicatorUpdate(list){
+  const b = document.getElementById("btnPms"); if(!b) return;
+  list = list || pmsDueList();
+  const anySet = allUnits().some(u=>pmsInfo(getAsset(u.name)));
+  const st = list.length ? "due" : (anySet ? "ok" : "none");
+  b.classList.remove("due","ok","none"); b.classList.add(st);
+  const n = document.getElementById("pmsCount0"); if(n) n.textContent = list.length > 9 ? "9+" : String(list.length);
+  b.title = st==="due" ? "PMS — " + list.length + " due: " + list.slice(0,4).map(x=>x.u.name+" "+x.i.txt).join(", ") + (list.length>4 ? "…" : "")
+          : st==="ok" ? "PMS — all up to date (nothing due in the next "+PMS_REMIND_DAYS+" days)" : "PMS — no dates set yet (tap to set up)";
+}
 function pmsCheck(){
-  const list = pmsDueList(), bar = document.getElementById("pmsBanner");
-  if(bar){
-    let dis = ""; try{ dis = window.localStorage.getItem(PMS_DISMISS_KEY) || ""; }catch(e){}
-    if(!list.length || dis === pmsToday()) bar.style.display = "none";
-    else {
-      const parts = list.slice(0,3).map(x=>escH(x.u.name)+" "+x.i.txt);
-      bar.innerHTML = `<span>🛠 <b>PMS reminder</b> — ${parts.join(" · ")}${list.length>3 ? " · +"+(list.length-3)+" more" : ""}</span><button type="button" class="btn primary" data-pms="view">View</button><button type="button" class="btn ghost" data-pms="hide">Hide today</button>`;
-      bar.style.display = "";
-    }
-  }
+  const list = pmsDueList();
+  pmsIndicatorUpdate(list);
   if(list.length && typeof tgReady==="function" && tgReady()){
     let sent = {}; try{ sent = JSON.parse(window.localStorage.getItem(PMS_SENT_KEY) || "{}"); }catch(e){}
     const fresh = [], cut = pmsAddMonths(pmsToday(), -4);
@@ -6026,14 +6119,14 @@ function pmsCheck(){
     list.forEach(x=>{ const k = x.u.name+"|"+x.a.pmsDue+"|"+(x.i.d<0 ? "overdue" : x.i.d===0 ? "due" : "5d"); if(!sent[k]){ sent[k] = pmsToday(); fresh.push(x); } });
     if(fresh.length){
       try{ window.localStorage.setItem(PMS_SENT_KEY, JSON.stringify(sent)); }catch(e){}
-      const text = "🛠 MUPS Watch — PMS reminder\n" + new Date().toLocaleDateString() + "\n\n" + fresh.map(x=>"• "+x.u.name+" ("+x.u.room+") — "+x.i.txt+" ["+x.a.pmsDue+"]\n  "+pmsTags(x.a)+(x.a.pmsMop && validUrl(x.a.pmsMop) ? "\n  MOP: "+x.a.pmsMop : "")).join("\n");
+      const text = "🛠 MUPS Watch — PMS reminder\n" + new Date().toLocaleDateString() + "\n\n" + fresh.map(x=>"• "+x.u.name+" ("+x.u.room+") — "+x.i.txt+" ["+x.a.pmsDue+"]\n  "+pmsTags(x.a, x.a.pmsDue)+(x.a.pmsMop && validUrl(x.a.pmsMop) ? "\n  MOP: "+x.a.pmsMop : "")).join("\n");
       tgSendText(text, true).catch(()=>{});
     }
   }
 }
 function pmsMarkDone(u){
   const key = assetKey(u.name), a = ASSETS[key]; if(!a) return;
-  const next = pmsNextDue(a.pmsDue, a.pmsFreq);
+  const next = pmsNextDue(a.pmsDue, a.pmsFreq, a);
   showConfirmModal("Mark PMS done?", escH(u.name)+" — done today. Next PMS will be due "+escH(next)+".", "Mark done", ()=>{
     a.pmsLast = pmsToday(); a.pmsLastBy = CUR_USER || ""; a.pmsDue = next; a.updated = new Date().toISOString();
     if(!saveAssets()){ showInfoModal("Couldn't save","Browser storage is full or blocked."); return; }
@@ -6041,11 +6134,77 @@ function pmsMarkDone(u){
     document.dispatchEvent(new Event("assets-changed")); showToast("✓ PMS recorded — next due "+next, 2200);
   });
 }
+/* PMS plan from "52_WEEKS_MONTHLY_PMS_UPS.xlsx": md = month/day for Jan…Dec (2027 tab, repeats every year — only the year changes),
+   m26 = explicit 2026 dates from the MUPS 2026 tab (UPS only), an = month of the annual “A” PMS. UPS = with battery test, all non-intrusive. */
+const PMS_PLAN = {"MUPS-1B":{"t":"UPS","md":["01-25","02-23","03-25","04-25","05-29","06-28","07-28","08-25","09-25","10-26","11-25","12-22"],"m26":{"1":"01-29","2":"02-27","3":"03-29","4":"04-29","5":"05-29","6":"06-28","7":"07-28","8":"08-25","9":"09-25","10":"10-27","11":"11-28","12":"12-28"},"an":7},"MUPS-2B":{"t":"UPS","md":["01-25","02-23","03-25","04-25","05-29","06-28","07-28","08-25","09-25","10-26","11-25","12-22"],"m26":{"1":"01-29","2":"02-27","3":"03-29","4":"04-29","5":"05-29","6":"06-28","7":"07-28","8":"08-25","9":"09-25","10":"10-27","11":"11-28","12":"12-28"},"an":7},"MUPS-3B":{"t":"UPS","md":["01-25","02-23","03-25","04-25","05-29","06-28","07-28","08-26","09-25","10-26","11-25","12-22"],"m26":{"1":"01-29","2":"02-27","3":"03-29","4":"04-29","5":"05-29","6":"06-28","7":"07-28","8":"08-26","9":"09-26","10":"10-28","11":"11-28","12":"12-28"},"an":7},"MUPS-4B":{"t":"UPS","md":["01-25","02-23","03-25","04-25","05-29","06-28","07-29","08-26","09-25","10-26","11-25","12-22"],"m26":{"1":"01-30","2":"02-28","3":"03-30","4":"04-30","5":"05-30","6":"06-29","7":"07-29","8":"08-26","9":"09-26","10":"10-28","11":"11-29","12":"12-29"},"an":7},"MUPS-5B":{"t":"UPS","md":["01-26","02-24","03-26","04-26","05-29","06-28","07-29","08-27","09-26","10-27","11-26","12-23"],"m26":{"1":"01-30","2":"02-28","3":"03-30","4":"04-30","5":"05-30","6":"06-29","7":"07-29","8":"08-27","9":"09-27","10":"10-28","11":"11-29","12":"12-29"},"an":7},"MUPS-6B":{"t":"UPS","md":["01-26","02-24","03-26","04-26","05-29","06-28","07-29","08-27","09-26","10-27","11-26","12-23"],"m26":{"1":"01-30","2":"02-28","3":"03-30","4":"04-30","5":"05-30","6":"06-29","7":"07-29","8":"08-27","9":"09-27","10":"10-28","11":"11-29","12":"12-29"},"an":7},"MUPS-13B":{"t":"UPS","md":["01-26","02-24","03-26","04-26","05-29","06-28","07-30","08-28","09-26","10-27","11-26","12-23"],"m26":{"5":"05-31","6":"06-30","7":"07-30","8":"08-28","9":"09-28","10":"10-29","11":"11-30","12":"12-30"},"an":3},"MUPS-14B":{"t":"UPS","md":["01-26","02-24","03-26","04-26","05-29",
+"06-28","07-30","08-28","09-27","10-27","11-26","12-23"],"m26":{"5":"05-31","6":"06-30","7":"07-30","8":"08-28","9":"09-28","10":"10-29","11":"11-30","12":"12-30"},"an":3},"MUPS-10B":{"t":"UPS","md":["01-27","02-25","03-27","04-27","05-29","06-28","07-31","08-29","09-27","10-28","11-27","12-26"],"m26":{"6":"06-30","7":"07-31","8":"08-29","9":"09-29","10":"10-29","11":"11-30","12":"12-30"},"an":3},"MUPS-11B":{"t":"UPS","md":["01-27","02-25","03-27","04-27","05-29","06-28","07-31","08-29","09-27","10-28","11-27","12-26"],"m26":{"6":"06-30","7":"07-31","8":"08-29","9":"09-29","10":"10-29","11":"11-30","12":"12-30"},"an":3},"MUPS-13A":{"t":"UPS","md":["01-27","02-25","03-27","04-27","05-29","06-28","07-31","08-30","09-27","10-28","11-27","12-26"],"m26":{"7":"07-31","8":"08-30","9":"09-29","10":"10-30","11":"11-30","12":"12-30"},"an":6},"MUPS-14A":{"t":"UPS","md":["01-27","02-25","03-27","04-27","05-29","06-28","07-31","08-30","09-28","10-28","11-27","12-26"],"m26":{"7":"07-31","8":"08-30","9":"09-29","10":"10-30","11":"11-30","12":"12-30"},"an":6},"MUPS-15A":{"t":"UPS","md":["01-28","02-26","03-28","04-28","05-29","06-28","07-31","08-31","09-28","10-29","11-28","12-27"],"m26":{"7":"07-31","8":"08-31","9":"09-30","10":"10-30","11":"11-30","12":"12-30"},"an":6},"MUPS-16A":{"t":"UPS","md":["01-28","02-26","03-28","04-28","05-29","06-28","07-31","08-31","09-28","10-29","11-28","12-27"],"m26":{"7":"07-31","8":"08-31","9":"09-30","10":"10-30","11":"11-30","12":"12-30"},"an":6},"MUPS-5A":{"t":"UPS","md":["01-28","02-26","03-28","04-28","05-29","06-28","07-31","08-30","09-28","10-29","11-28","12-27"],"m26":{"10":"10-31","11":"11-30","12":"12-30"},"an":10},"MUPS-6A":{"t":"UPS","md":["01-28","02-26","03-28","04-28","05-29","06-28","07-28","08-30","09-29","10-29","11-28","12-27"],"m26":{"10":"10-31","11":"11-30","12":"12-30"},"an":10},"MUPS-7A":{"t":"UPS","md":["01-29","02-27","03-29","04-29","05-29","06-28","07-28","08-31","09-29","10-30","11-29","12-28"],"m26":{"12":"12-30"},"an":10},"MUPS-8A":{"t":"UPS","md":["01-29","02-27"
+,"03-29","04-29","05-29","06-28","07-28","08-31","09-29","10-30","11-29","12-28"],"m26":{"12":"12-30"},"an":10},"MUPS-1A":{"t":"UPS","md":["01-29","02-27","03-29","04-29","05-29","06-28","07-28","08-30","09-29","10-30","11-29","12-28"],"m26":{"9":"09-30","10":"10-31","11":"11-30","12":"12-30"},"an":8},"MUPS-2A":{"t":"UPS","md":["01-29","02-27","03-29","04-29","05-29","06-28","07-28","08-30","09-30","10-30","11-29","12-28"],"m26":{"9":"09-30","10":"10-31","11":"11-30","12":"12-30"},"an":8},"MUPS-3A":{"t":"UPS","md":["01-30","02-28","03-30","04-30","05-29","06-28","07-28","08-31","09-30","10-31","11-30","12-29"],"m26":{"11":"11-30","12":"12-30"},"an":9},"MUPS-4A":{"t":"UPS","md":["01-30","02-28","03-30","04-30","05-29","06-28","07-28","08-31","09-30","10-31","11-30","12-29"],"m26":{"11":"11-30","12":"12-30"},"an":9},"MUPS-9A":{"t":"UPS","md":["01-30","02-28","03-30","04-30","05-29","06-28","07-28","08-31","09-30","10-31","11-30","12-29"],"m26":{"12":"12-30"},"an":9},"MUPS-10A":{"t":"UPS","md":["01-30","02-28","03-30","04-30","05-29","06-28","07-28","08-31","09-30","10-31","11-30","12-29"],"m26":{"12":"12-30"},"an":9},"STS-1B":{"t":"STS","md":["01-25","02-23","03-25","04-25","05-29","06-28","07-28","08-25","09-25","10-26","11-25","12-22"],"m26":{},"an":0},"STS-2B":{"t":"STS","md":["01-25","02-23","03-25","04-25","05-29","06-28","07-28","08-25","09-25","10-26","11-25","12-22"],"m26":{},"an":0},"STS-3B":{"t":"STS","md":["01-25","02-23","03-25","04-25","05-29","06-28","07-28","08-26","09-25","10-26","11-25","12-22"],"m26":{},"an":0},"STS-4B":{"t":"STS","md":["01-25","02-23","03-25","04-25","05-29","06-28","07-29","08-26","09-25","10-26","11-25","12-22"],"m26":{},"an":0},"STS-5B":{"t":"STS","md":["01-26","02-24","03-26","04-26","05-29","06-28","07-29","08-27","09-26","10-27","11-26","12-23"],"m26":{},"an":0},"STS-6B":{"t":"STS","md":["01-26","02-24","03-26","04-26","05-29","06-28","07-29","08-27","09-26","10-27","11-26","12-23"],"m26":{},"an":0},"STS-7B":{"t":"STS","md":["01-26","02-24","03-26","04-26","05-29","06-28","
+07-30","08-28","09-26","10-27","11-26","12-23"],"m26":{},"an":0},"STS-8B":{"t":"STS","md":["01-26","02-24","03-26","04-26","05-29","06-28","07-30","08-28","09-27","10-27","11-26","12-23"],"m26":{},"an":0},"STS-9B":{"t":"STS","md":["01-27","02-25","03-27","04-27","05-29","06-28","07-31","08-29","09-27","10-28","11-27","12-26"],"m26":{},"an":0},"STS-10B":{"t":"STS","md":["01-27","02-25","03-27","04-27","05-29","06-28","07-31","08-29","09-27","10-28","11-27","12-26"],"m26":{},"an":0},"STS-21A":{"t":"STS","md":["01-27","02-25","03-27","04-27","05-29","06-28","07-31","08-30","09-27","10-28","11-27","12-26"],"m26":{},"an":0},"STS-22A":{"t":"STS","md":["01-27","02-25","03-27","04-27","05-29","06-28","07-31","08-30","09-28","10-28","11-27","12-26"],"m26":{},"an":0}};
+const PMS_ASK_KEY = "mups_pms_plan_asked_v2";
+/* tolerant name matching: ignores case, spaces, hyphens and "(old name)" notes, and knows the 19A→13A style renames */
+const PMS_ALIAS = {"MUPS19A":"MUPS13A","MUPS20A":"MUPS14A","MUPS23A":"MUPS15A","MUPS24A":"MUPS16A"};
+function pmsKey(n){ const k = String(n||"").replace(/\(.*?\)/g,"").toUpperCase().replace(/[^A-Z0-9]/g,""); return PMS_ALIAS[k] || k; }
+const PMS_IDX = (function(){ const o = {}; Object.keys(PMS_PLAN).forEach(k=>{ o[pmsKey(k)] = k; }); return o; })();
+function pmsPlanFor(name){ const k = PMS_IDX[pmsKey(name)]; return k ? { key:k, p:PMS_PLAN[k] } : null; }
+function pmsApplyPlan(){
+  const today = pmsToday(), usedPlan = new Set(), applied = [], notInExcel = [];
+  allUnits().forEach(u=>{
+    if(!u.roomKey) return;
+    const hit = pmsPlanFor(u.name);
+    if(!hit){ notInExcel.push(u.name); return; }
+    const p = hit.p, key = assetKey(u.name);
+    const a = ASSETS[key] || (ASSETS[key] = {});
+    a.pmsFreq = "monthly"; a.pmsType = "non-intrusive"; a.pmsBatt = p.t === "UPS";
+    a.pmsMD = p.md.slice(); a.pmsMD26 = Object.assign({}, p.m26); a.pmsAnnual = p.an || 0;
+    a.pmsDue = pmsPlanNext(a, today, true) || a.pmsDue || ""; a.updated = new Date().toISOString();
+    usedPlan.add(hit.key); applied.push(u.name);
+  });
+  const missing = Object.keys(PMS_PLAN).filter(k=>!usedPlan.has(k));
+  if(!applied.length){
+    showInfoModal("No matching units", "None of this app's unit names match the PMS Excel, so nothing was changed.<br><br>Names in this app: " + (notInExcel.map(escH).join(", ") || "none") + ".");
+    return;
+  }
+  if(!saveAssets()){ showInfoModal("Couldn't save","Browser storage is full or blocked."); return; }
+  try{ logAudit(null, `PMS plan applied to ${applied.length} unit(s).`); anCount("pms_plan"); }catch(e){}
+  try{ window.localStorage.setItem(PMS_ASK_KEY, "1"); }catch(e){}
+  document.dispatchEvent(new Event("assets-changed"));
+  try{ renderAll(); }catch(e){}
+  showInfoModal("PMS plan applied", `<b>${applied.length}</b> units now have their next PMS date (monthly, non-intrusive; battery test on UPS only; annual month marked). It also shows as a 🛠 date next to each unit in the readings tables.`
+    + (missing.length ? `<br><br>In the Excel but not in this app (skipped): ${missing.map(escH).join(", ")}.` : "")
+    + (notInExcel.length ? `<br><br>In this app but not in the Excel: ${notInExcel.map(escH).join(", ")}.` : ""));
+}
+function pmsAskApply(){
+  const n = allUnits().filter(u=>u.roomKey && pmsPlanFor(u.name)).length;
+  if(!n){
+    showInfoModal("No matching units", "None of this app's unit names match the PMS Excel.<br><br>Names in this app: " + (allUnits().filter(u=>u.roomKey).map(u=>escH(u.name)).join(", ") || "none") + ".");
+    return;
+  }
+  showConfirmModal("Apply PMS plan from Excel?", `Sets the next PMS date for <b>${n}</b> matching UPS/STS from your 52-week plan: monthly, non-intrusive, battery test on UPS only, annual month marked. Month and day repeat every year (only the year changes). This overwrites the PMS dates on those units; MOP links and history are kept.`, "Apply plan", pmsApplyPlan);
+}
+/* small 🛠 date chip next to every unit in the readings tables */
+const PMS_MON = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+function pmsRefreshChips(){
+  document.querySelectorAll(".assetbtn").forEach(b=>{
+    const wrap = b.parentNode; if(!wrap) return;
+    const old = wrap.querySelector(".pmschip"); if(old) old.remove();
+    const r = STATE[b.getAttribute("data-rk")], u = r && r[b.getAttribute("data-sec")][+b.getAttribute("data-i")];
+    const a = u && u.n ? getAsset(u.n) : null, i = pmsInfo(a); if(!i) return;
+    const annual = pmsTags(a, a.pmsDue).indexOf("ANNUAL") === 0;
+    const c = document.createElement("button");
+    c.type = "button"; c.className = "pmschip no-print pms-" + i.state;
+    c.textContent = "🛠 " + (+a.pmsDue.slice(8,10)) + " " + PMS_MON[+a.pmsDue.slice(5,7)-1] + (annual ? " A" : "");
+    c.title = "PMS " + a.pmsDue + " · " + i.txt + " · " + pmsTags(a, a.pmsDue) + " — tap to edit";
+    c.addEventListener("click", ()=>openAssetFromLog(b.getAttribute("data-rk"), b.getAttribute("data-sec"), +b.getAttribute("data-i")));
+    wrap.appendChild(c);
+  });
+}
+window.pmsAskApply = pmsAskApply; window.pmsApplyPlan = pmsApplyPlan;
+{ const _ra = renderAll; renderAll = function(){ const out = _ra.apply(this, arguments); try{ pmsRefreshChips(); }catch(e){} return out; }; }
 let pmsDraw = null;
 function showPmsSchedule(){
   try{ anCount("pms_view"); }catch(e){}
   const { backdrop } = showFormModal("🛠 PMS schedule", "Reminders start "+PMS_REMIND_DAYS+" days before each due date. The app can only remind you when it is open — use the calendar export to get phone alerts even when it is closed.",
-    `<div class="sub" id="pmsCount" style="margin:0 0 6px;color:var(--text-dim);font:11px var(--font-mono)"></div><div id="pmsList"></div>`, "📅 Export to calendar (.ics)", ()=>{ pmsExportIcs(); });
+    `<div class="sub" id="pmsCount" style="margin:0 0 6px;color:var(--text-dim);font:11px var(--font-mono)"></div><div class="asset-links no-print" style="margin:0 0 8px"><button type="button" class="btn ghost" data-plan="1">⬇ Apply PMS plan from the Excel (2026–2027)</button></div><div id="pmsList"></div>`, "📅 Export to calendar (.ics)", ()=>{ pmsExportIcs(); });
   backdrop.querySelector(".modal-card").classList.add("wide");
   const list = backdrop.querySelector("#pmsList");
   pmsDraw = function(){
@@ -6056,7 +6215,7 @@ function showPmsSchedule(){
     const row = (x, isSet)=>{
       const i = pmsInfo(x.a), idx = units.indexOf(x);
       return `<div class="arow"><div class="arow-main" style="cursor:default"><b>${escH(x.u.name)} <span style="font:11px var(--font-mono);color:var(--text-dim)">${escH(x.u.type)} · ${escH(x.u.room)}</span></b>`
-        + (isSet ? `<span class="adesc pms-${i.state}">🛠 ${escH(x.a.pmsDue)} · ${i.txt}</span><span class="adesc">${escH(pmsTags(x.a))}</span>${x.a.pmsLast ? `<span class="adesc">last done ${escH(x.a.pmsLast)}${x.a.pmsLastBy ? " by "+escH(x.a.pmsLastBy) : ""}</span>` : ""}` : `<span class="adesc">no PMS date yet — tap ✏ to set one</span>`)
+        + (isSet ? `<span class="adesc pms-${i.state}">🛠 ${escH(x.a.pmsDue)} · ${i.txt}</span><span class="adesc">${escH(pmsTags(x.a, x.a.pmsDue))}</span>${x.a.pmsLast ? `<span class="adesc">last done ${escH(x.a.pmsLast)}${x.a.pmsLastBy ? " by "+escH(x.a.pmsLastBy) : ""}</span>` : ""}` : `<span class="adesc">no PMS date yet — tap ✏ to set one</span>`)
         + `</div><span class="pms-btns">${x.a.pmsMop && validUrl(x.a.pmsMop) ? `<a class="btn ghost pms-mini" href="${escH(x.a.pmsMop)}" target="_blank" rel="noopener noreferrer" title="Open MOP" aria-label="Open MOP for ${escH(x.u.name)}">📋</a>` : ""}`
         + (isSet ? `<button type="button" class="btn ghost" data-done="${idx}" title="Mark done today" aria-label="Mark PMS done for ${escH(x.u.name)}">✔</button>` : "")
         + `<button type="button" class="btn ghost" data-edit="${idx}" title="Edit PMS details" aria-label="Edit PMS for ${escH(x.u.name)}">✏</button></span></div>`;
@@ -6064,6 +6223,7 @@ function showPmsSchedule(){
     list.innerHTML = set.map(x=>row(x,true)).join("") + (unset.length ? `<div class="sub" style="padding:8px 4px 2px;color:var(--text-dim);font:11px var(--font-mono)">NOT SCHEDULED</div>` + unset.map(x=>row(x,false)).join("") : "");
     list._units = units;
   };
+  backdrop.querySelector("[data-plan]").addEventListener("click", ()=>{ pmsAskApply(); });
   list.addEventListener("click",(e)=>{
     const d = e.target.closest("[data-done]"), ed = e.target.closest("[data-edit]");
     if(d){ const x = list._units[+d.getAttribute("data-done")]; if(x) pmsMarkDone(x.u); }
@@ -6076,36 +6236,60 @@ function pmsExportIcs(){
   const esc = s => String(s==null?"":s).replace(/\\/g,"\\\\").replace(/;/g,"\\;").replace(/,/g,"\\,").replace(/\r?\n/g,"\\n");
   const fold = l => { const out = []; while(l.length > 70){ out.push(l.slice(0,70)); l = " "+l.slice(70); } out.push(l); return out.join("\r\n"); };
   const compact = d => d.replace(/-/g,"");
+  const nextDay = d => { const t = new Date(d+"T00:00:00"); t.setDate(t.getDate()+1); return t.getFullYear()+pmsPad(t.getMonth()+1)+pmsPad(t.getDate()); };
   const stamp = new Date().toISOString().replace(/[-:]/g,"").replace(/\.\d+/,"");
-  const lines = ["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//MUPS Watch//PMS//EN","CALSCALE:GREGORIAN"];
-  let n = 0;
+  const today = pmsToday(), y0 = +today.slice(0,4), end = (y0+1)+"-12-31";
+  const byDate = {}, singles = [];
   allUnits().forEach(u=>{
-    const a = getAsset(u.name); if(!a || !pmsInfo(a)) return; n++;
-    const end = new Date(a.pmsDue+"T00:00:00"); end.setDate(end.getDate()+1);
-    const endS = end.getFullYear()+pmsPad(end.getMonth()+1)+pmsPad(end.getDate());
-    const f = PMS_FREQ[a.pmsFreq] || PMS_FREQ.monthly;
-    lines.push("BEGIN:VEVENT","UID:pms-"+assetKey(u.name).replace(/[^A-Z0-9]/g,"")+"@mupswatch","DTSTAMP:"+stamp,"DTSTART;VALUE=DATE:"+compact(a.pmsDue),"DTEND;VALUE=DATE:"+endS,
-      "SUMMARY:"+esc("PMS — "+u.name+" ("+pmsTags(a)+")"),
-      "DESCRIPTION:"+esc(u.type+" · "+u.room+(a.pmsMop && validUrl(a.pmsMop) ? "\nMOP: "+a.pmsMop : "")),
-      "RRULE:"+f.rr,"BEGIN:VALARM","ACTION:DISPLAY","DESCRIPTION:"+esc("PMS due in "+PMS_REMIND_DAYS+" days — "+u.name),"TRIGGER:-P"+PMS_REMIND_DAYS+"D","END:VALARM","END:VEVENT");
+    const a = getAsset(u.name); if(!a || !pmsInfo(a)) return;
+    if((a.pmsMD||[]).some(Boolean)){ for(let y=y0; y<=y0+1; y++) pmsPlanDates(a,y).forEach(d=>{ if(d>=today && d<=end) (byDate[d] = byDate[d] || []).push({u,a}); }); }
+    else singles.push({u,a});
+  });
+  const lines = ["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//MUPS Watch//PMS//EN","CALSCALE:GREGORIAN"];
+  const alarm = (txt)=>["BEGIN:VALARM","ACTION:DISPLAY","DESCRIPTION:"+esc(txt),"TRIGGER:-P"+PMS_REMIND_DAYS+"D","END:VALARM"];
+  let n = 0;
+  Object.keys(byDate).sort().forEach(d=>{
+    const items = byDate[d]; n++;
+    const names = items.map(x=>x.u.name), annual = items.filter(x=>pmsTags(x.a,d).indexOf("ANNUAL")===0).map(x=>x.u.name);
+    const title = "PMS — " + (names.length>3 ? names.slice(0,3).join(", ")+" +"+(names.length-3)+" more" : names.join(", ")) + (annual.length ? " (ANNUAL: "+annual.join(", ")+")" : "");
+    const desc = items.map(x=>x.u.name+" ("+x.u.room+") — "+pmsTags(x.a,d)+(x.a.pmsMop && validUrl(x.a.pmsMop) ? " — MOP: "+x.a.pmsMop : "")).join("\n");
+    lines.push("BEGIN:VEVENT","UID:pms-"+d+"@mupswatch","DTSTAMP:"+stamp,"DTSTART;VALUE=DATE:"+compact(d),"DTEND;VALUE=DATE:"+nextDay(d),"SUMMARY:"+esc(title),"DESCRIPTION:"+esc(desc),...alarm("PMS due in "+PMS_REMIND_DAYS+" days — "+names.length+" unit(s)"),"END:VEVENT");
+  });
+  singles.forEach(({u,a})=>{
+    n++; const f = PMS_FREQ[a.pmsFreq] || PMS_FREQ.monthly;
+    lines.push("BEGIN:VEVENT","UID:pms-"+assetKey(u.name).replace(/[^A-Z0-9]/g,"")+"@mupswatch","DTSTAMP:"+stamp,"DTSTART;VALUE=DATE:"+compact(a.pmsDue),"DTEND;VALUE=DATE:"+nextDay(a.pmsDue),
+      "SUMMARY:"+esc("PMS — "+u.name+" ("+pmsTags(a,a.pmsDue)+")"),"DESCRIPTION:"+esc(u.type+" · "+u.room+(a.pmsMop && validUrl(a.pmsMop) ? "\nMOP: "+a.pmsMop : "")),"RRULE:"+f.rr,...alarm("PMS due in "+PMS_REMIND_DAYS+" days — "+u.name),"END:VEVENT");
   });
   lines.push("END:VCALENDAR");
   if(!n){ showInfoModal("Nothing to export","Set a next PMS due date on at least one unit first (✏ next to the unit)."); return; }
   downloadTextFile("MUPS-Watch-PMS-calendar.ics", lines.map(fold).join("\r\n")+"\r\n", "text/calendar");
-  try{ logAudit(null, `Exported PMS calendar (${n} unit(s)).`); anCount("pms_ics"); }catch(e){}
+  try{ logAudit(null, `Exported PMS calendar (${n} event(s)).`); anCount("pms_ics"); }catch(e){}
   showToast("📅 Calendar file saved — open it to add the reminders", 3200);
 }
 function pmsInit(){
+  const pb = document.getElementById("btnPms"); if(pb) pb.addEventListener("click", ()=>showPmsSchedule());
   const bar = document.getElementById("pmsBanner");
   if(bar) bar.addEventListener("click",(e)=>{
     const b = e.target.closest("[data-pms]"); if(!b) return;
     if(b.getAttribute("data-pms")==="view") showPmsSchedule();
     else { try{ window.localStorage.setItem(PMS_DISMISS_KEY, pmsToday()); }catch(er){} pmsCheck(); }
   });
-  document.addEventListener("assets-changed", ()=>{ if(typeof pmsDraw==="function" && pmsDraw) pmsDraw(); pmsCheck(); });
+  document.addEventListener("assets-changed", ()=>{ if(typeof pmsDraw==="function" && pmsDraw) pmsDraw(); pmsCheck(); try{ pmsRefreshChips(); }catch(e){} });
+  try{ pmsRefreshChips(); }catch(e){}
   document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState==="visible") pmsCheck(); });
   setInterval(pmsCheck, 3600000);
   setTimeout(pmsCheck, 2500);
+  const offer = (tries)=>{   // offer the Excel plan at launch until it is applied (or "Don't ask again")
+    try{ if(window.localStorage.getItem(PMS_ASK_KEY)) return; }catch(e){}
+    if(document.querySelector(".modal-backdrop")){ if(tries < 4) setTimeout(()=>offer(tries+1), 6000); return; }
+    const n = allUnits().filter(u=>u.roomKey && pmsPlanFor(u.name)).length; if(!n) return;
+    let close = ()=>{};
+    close = showModal("Set up the PMS schedule?", `Your 52-week PMS plan from the Excel is built into this version. Apply it now to the <b>${n}</b> matching UPS/STS? Each unit gets its next PMS date (monthly, non-intrusive, battery test on UPS only, annual month marked).`, [
+      { label:"✔ Apply plan now", cls:"primary", onClick: ()=>{ close(); pmsApplyPlan(); } },
+      { label:"Don't ask again", cls:"ghost", onClick: ()=>{ try{ window.localStorage.setItem(PMS_ASK_KEY, "1"); }catch(e){} close(); } }
+    ]);
+  };
+  setTimeout(()=>offer(0), 5000);
 }
 
 /* ---- in-app guide ---- */
@@ -6658,7 +6842,7 @@ setTimeout(tgFlushQueue, 4000);
       private chat. Nothing is shown in the app except the hidden
       developer panel (tap the app name 7 times).
    ========================================================= */
-const APP_VERSION = "V11_25";
+const APP_VERSION = "V11_28";
 
 /* >>> DEVELOPER: create a SEPARATE bot in @BotFather just for these reports,
        press Start on it, then paste its token and your own chat ID here. <<<
