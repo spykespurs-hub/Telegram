@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>MUPS Watch — OCR Capture Prototype v2 (auto-detect)</title>
+<style>
+  :root{
+    --bg:#0A0E13; --panel:#111721; --panel-2:#182130; --panel-3:#1F2A3B;
+    --border:#26333F; --border-soft:#1C2732;
+    --text:#E7EEF5; --text-dim:#8FA0AF; --text-faint:#5C6C7A;
+    --amber:#F2A93B; --amber-dim:#7A5A22;
+    --green:#33D690; --green-dim:#1B4A38;
+    --red:#FF5D6C; --red-dim:#5A2028;
+    --blue:#5AA9E6;
+    --font-display:'Space Grotesk',sans-serif;
+    --font-body:'Inter',system-ui,sans-serif;
+    --font-mono:'JetBrains Mono',monospace;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:var(--font-body);-webkit-font-smoothing:antialiased;}
+  #app{position:fixed;inset:0;display:flex;flex-direction:column;}
+
+  /* ---------- Field picker ---------- */
+  .picker-screen{flex:1;display:none;flex-direction:column;overflow:hidden;}
+  .picker-screen.active{display:flex;}
+  .picker-head{padding:16px 16px 10px;flex:none;}
+  .picker-head h1{font-size:17px;margin:0 0 4px;font-family:var(--font-display);}
+  .picker-head p{font-size:12.5px;color:var(--text-dim);margin:0;line-height:1.5;}
+  .picker-list{flex:1;overflow-y:auto;padding:6px 16px 20px;}
+  .panel-group{margin-bottom:18px;}
+  .panel-group h3{font-family:var(--font-mono);font-size:10.5px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-faint);margin:0 0 8px;}
+  .field-btn{
+    width:100%;text-align:left;background:var(--panel);border:1px solid var(--border-soft);color:var(--text);
+    border-radius:10px;padding:12px 14px;margin-bottom:8px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:10px;
+  }
+  .field-btn:active{border-color:var(--green-dim);background:var(--panel-2);}
+  .field-btn .fname{font-size:13.5px;font-weight:600;}
+  .field-btn .fmeta{font-family:var(--font-mono);font-size:10.5px;color:var(--text-faint);margin-top:2px;}
+  .field-btn .fcount{font-family:var(--font-mono);font-size:11px;color:var(--amber);border:1px solid var(--amber-dim);border-radius:999px;padding:3px 8px;white-space:nowrap;}
+  .picker-foot{flex:none;padding:10px 16px calc(14px + env(safe-area-inset-bottom,0px));border-top:1px solid var(--border);}
+  .picker-foot .pill-btn{width:100%;text-align:center;}
+
+  .warn-box{
+    background:rgba(242,169,59,.08);border:1px solid var(--amber-dim);
+    border-radius:10px;padding:11px 13px;font-size:11.5px;color:var(--amber);text-align:left;line-height:1.5;margin:10px 16px 0;
+  }
+
+  .pill-btn{
+    font-family:var(--font-body);font-weight:600;font-size:13px;
+    border:1px solid var(--border);background:rgba(17,23,33,.85);color:var(--text);
+    padding:10px 16px;border-radius:999px;cursor:pointer;
+  }
+  .pill-btn.ghost{background:transparent;color:var(--text-dim);}
+  .pill-btn.green{background:linear-gradient(180deg,#3fe3a0,#28c084);border:none;color:#0d1712;}
+
+  /* ---------- Camera stage ---------- */
+  .camera-stage{position:relative;flex:1;overflow:hidden;display:none;background:#000;}
+  .camera-stage.active{display:block;}
+  video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;}
+
+  .hint-bar{
+    position:absolute;top:0;left:0;right:0;z-index:10;
+    padding:14px 16px calc(14px + env(safe-area-inset-top,0px));
+    background:linear-gradient(180deg,rgba(6,9,13,.9),rgba(6,9,13,0));
+    pointer-events:none;
+  }
+  .hint-bar .step-label{font-family:var(--font-mono);font-size:10px;letter-spacing:1.5px;color:var(--amber);text-transform:uppercase;margin-bottom:4px;}
+  .hint-bar .step-text{font-size:14.5px;font-weight:600;line-height:1.4;}
+
+  .reticle{
+    position:absolute;left:50%;top:44%;transform:translate(-50%,-50%);
+    border:2.5px solid var(--amber);border-radius:10px;
+    box-shadow:0 0 0 2000px rgba(6,9,13,.45);
+    transition:border-color .2s, box-shadow .2s;
+    pointer-events:none;
+  }
+  .reticle.locking{border-color:#ffd27a;}
+  .reticle.locked{border-color:var(--green);box-shadow:0 0 0 2000px rgba(6,9,13,.45), 0 0 24px rgba(51,214,144,.6);}
+  .reticle .corner{position:absolute;width:14px;height:14px;border-color:inherit;}
+  .reticle .c-tl{top:-2.5px;left:-2.5px;border-top:2.5px solid;border-left:2.5px solid;}
+  .reticle .c-tr{top:-2.5px;right:-2.5px;border-top:2.5px solid;border-right:2.5px solid;}
+  .reticle .c-bl{bottom:-2.5px;left:-2.5px;border-bottom:2.5px solid;border-left:2.5px solid;}
+  .reticle .c-br{bottom:-2.5px;right:-2.5px;border-bottom:2.5px solid;border-right:2.5px solid;}
+
+  .live-read{
+    position:absolute;left:50%;top:calc(44% + 10px);transform:translate(-50%,0);
+    z-index:9;font-family:var(--font-mono);text-align:center;pointer-events:none;
+    font-size:12px;color:var(--text-dim);white-space:nowrap;
+  }
+  .live-read .vals{font-size:16px;font-weight:700;color:var(--text);margin-top:4px;}
+  .live-read.locked .vals{color:var(--green);}
+
+  .frame-badge{
+    position:absolute;top:12px;right:12px;z-index:10;
+    background:rgba(10,14,19,.85);border:1px solid var(--border);border-radius:8px;
+    padding:5px 9px;font-family:var(--font-mono);font-size:10.5px;color:var(--text-dim);
+  }
+  .frame-badge.on{color:var(--amber);border-color:var(--amber-dim);}
+
+  .bottom-bar{
+    position:absolute;left:0;right:0;bottom:0;z-index:10;
+    padding:14px 16px calc(16px + env(safe-area-inset-bottom,0px));
+    background:linear-gradient(0deg,rgba(6,9,13,.92),rgba(6,9,13,0));
+    display:flex;gap:10px;justify-content:center;
+  }
+  .pill-btn.danger{border-color:var(--red-dim);color:#ffd7db;}
+
+  .toast{
+    position:absolute;left:50%;bottom:100px;transform:translate(-50%,0);z-index:15;
+    background:rgba(27,74,56,.92);border:1px solid var(--green-dim);color:#d3ffe9;
+    font-family:var(--font-mono);font-size:12.5px;padding:9px 16px;border-radius:999px;
+    opacity:0;transition:opacity .25s, transform .25s;pointer-events:none;
+  }
+  .toast.show{opacity:1;transform:translate(-50%,-6px);}
+
+  /* ---------- Review sheet (manual fallback) ---------- */
+  .review-sheet{position:fixed;inset:0;z-index:30;background:var(--bg);display:none;flex-direction:column;overflow:hidden;}
+  .review-sheet.active{display:flex;}
+  .review-head{padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:10px;flex:none;}
+  .review-head h2{font-size:15px;margin:0;font-family:var(--font-display);}
+  .review-body{flex:1;overflow-y:auto;padding:14px 16px 20px;}
+  .crop-preview{width:100%;border-radius:8px;border:1px solid var(--border-soft);margin-bottom:14px;display:block;}
+  .raw-text-box{
+    background:var(--panel);border:1px solid var(--border-soft);border-radius:8px;padding:10px;
+    font-family:var(--font-mono);font-size:11px;color:var(--text-faint);white-space:pre-wrap;word-break:break-word;
+    max-height:80px;overflow-y:auto;margin-bottom:16px;
+  }
+  .field-inputs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;}
+  .field-inputs .fi{flex:1;min-width:80px;}
+  .field-inputs label{display:block;font-family:var(--font-mono);font-size:9.5px;color:var(--text-faint);margin-bottom:4px;text-transform:uppercase;}
+  .field-inputs input{
+    width:100%;background:var(--panel);border:1px solid var(--border-soft);color:var(--text);
+    font-family:var(--font-mono);font-size:15px;padding:9px 8px;border-radius:8px;outline:none;text-align:center;
+  }
+  .field-inputs input:focus{border-color:var(--blue);}
+  .review-actions{display:flex;gap:10px;flex:none;padding:12px 16px calc(14px + env(safe-area-inset-bottom,0px));border-top:1px solid var(--border);}
+  .review-actions .pill-btn{flex:1;text-align:center;justify-content:center;padding:13px;}
+
+  /* ---------- Log ---------- */
+  .log-sheet{position:fixed;inset:0;z-index:40;background:var(--bg);display:none;flex-direction:column;}
+  .log-sheet.active{display:flex;}
+  .log-head{padding:14px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;flex:none;}
+  .log-body{flex:1;overflow-y:auto;padding:14px 16px;}
+  .log-entry{background:var(--panel);border:1px solid var(--border-soft);border-radius:10px;padding:12px;margin-bottom:10px;}
+  .log-entry .tag{font-family:var(--font-mono);font-size:10px;color:var(--green);letter-spacing:.5px;text-transform:uppercase;margin-bottom:6px;}
+  .log-entry .vals{font-family:var(--font-mono);font-size:13px;color:var(--text);}
+  .log-entry .src{font-family:var(--font-mono);font-size:10px;color:var(--text-faint);margin-top:4px;}
+  .empty-note{font-size:12.5px;color:var(--text-faint);line-height:1.6;padding:0 2px;}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- FIELD PICKER -->
+  <div class="picker-screen active" id="pickerScreen">
+    <div class="picker-head">
+      <h1>MUPS Watch — OCR Capture v2</h1>
+      <p>Pick the reading you want to capture first, then point the camera at the panel — it auto-locks on when the numbers match what's expected.</p>
+    </div>
+    <div class="picker-list" id="pickerList"></div>
+    <div class="warn-box">Needs internet the first time (OCR engine + language data). Needs a secure page (https:// or localhost) for camera access on Android Chrome — see earlier note if it fails to open.</div>
+    <div class="picker-foot">
+      <button class="pill-btn ghost" id="btnViewLog" style="display:none;width:100%;">View captured readings</button>
+    </div>
+  </div>
+
+  <!-- CAMERA STAGE -->
+  <div class="camera-stage" id="cameraStage">
+    <video id="video" autoplay playsinline muted></video>
+    <div class="frame-badge" id="frameBadge">idle</div>
+    <div class="hint-bar">
+      <div class="step-label" id="stepLabel">Scanning</div>
+      <div class="step-text" id="stepText">Point the camera at the target reading</div>
+    </div>
+    <div class="reticle" id="reticle">
+      <span class="corner c-tl"></span><span class="corner c-tr"></span>
+      <span class="corner c-bl"></span><span class="corner c-br"></span>
+    </div>
+    <div class="live-read" id="liveRead">
+      <div class="label" id="liveReadLabel">—</div>
+      <div class="vals" id="liveReadVals">…</div>
+    </div>
+    <div class="toast" id="toast">Captured ✓</div>
+    <div class="bottom-bar">
+      <button class="pill-btn ghost" id="btnManualCapture">Capture now (manual)</button>
+      <button class="pill-btn danger" id="btnCloseCamera">Close camera</button>
+    </div>
+  </div>
+
+  <!-- REVIEW SHEET (manual fallback) -->
+  <div class="review-sheet" id="reviewSheet">
+    <div class="review-head">
+      <h2>Confirm reading</h2>
+      <button class="pill-btn ghost" id="btnCancelReview">Cancel</button>
+    </div>
+    <div class="review-body" id="reviewBody"></div>
+    <div class="review-actions">
+      <button class="pill-btn ghost" id="btnRetake">Retake</button>
+      <button class="pill-btn green" id="btnConfirmReading">✓ Confirm &amp; save</button>
+    </div>
+  </div>
+
+  <!-- LOG SHEET -->
+  <div class="log-sheet" id="logSheet">
+    <div class="log-head">
+      <h2 style="font-size:15px;margin:0;font-family:var(--font-display);">Captured readings (this session)</h2>
+      <button class="pill-btn ghost" id="btnCloseLog">Close</button>
+    </div>
+    <div class="log-body" id="logBody"></div>
+  </div>
+
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.0.4/tesseract.min.js"></script>
+<script>
+(function(){
+"use strict";
+
+/* =========================================================
+   FIELD DEFINITIONS
+   Each field tells the scanner: how many numbers to expect,
+   what range each should fall in (if any — matches the same
+   SPEC thresholds used in the main MUPS Watch log), and what
+   reticle size fits that reading on the physical panel.
+   ========================================================= */
+const FIELD_DEFS = [
+  { id:'out_v',    panel:'Output Meters',  label:'Output Voltage', sub:'L1-L2 / L2-L3 / L3-L1', count:3, spec:{min:360,max:440}, unit:'V', reticle:{w:0.62,h:0.30} },
+  { id:'out_a',    panel:'Output Meters',  label:'Output Current', sub:'L1-L2 / L2-L3 / L3-L1', count:3, spec:null, unit:'A', reticle:{w:0.62,h:0.30} },
+  { id:'out_kva',  panel:'Output Meters',  label:'Load kVA',       sub:'L1-L2 / L2-L3 / L3-L1', count:3, spec:null, unit:'kVA', reticle:{w:0.62,h:0.30} },
+  { id:'out_kw',   panel:'Output Meters',  label:'Load kW',        sub:'L1-L2 / L2-L3 / L3-L1', count:3, spec:null, unit:'kW', reticle:{w:0.62,h:0.30} },
+  { id:'freq',     panel:'Output Meters',  label:'Frequency',      sub:'single reading',        count:1, spec:{min:56,max:64}, unit:'Hz', reticle:{w:0.32,h:0.14} },
+  { id:'in_v',     panel:'Input Meters',   label:'Input Voltage',  sub:'L1-L2 / L2-L3 / L3-L1', count:3, spec:{min:360,max:440}, unit:'V', reticle:{w:0.62,h:0.30} },
+  { id:'batt_v',   panel:'Battery Meters', label:'Battery Voltage',sub:'single reading',        count:1, spec:{min:400,max:600}, unit:'V', reticle:{w:0.36,h:0.16} },
+  { id:'batt_a',   panel:'Battery Meters', label:'Battery Current',sub:'single reading',        count:1, spec:{max:5}, unit:'A', reticle:{w:0.36,h:0.16} },
+  { id:'batt_rt',  panel:'Battery Meters', label:'Estimated Runtime', sub:'single reading',     count:1, spec:null, unit:'min', reticle:{w:0.36,h:0.16} },
+  { id:'batt_cap', panel:'Battery Meters', label:'Battery Capacity',  sub:'single reading',     count:1, spec:{min:0,max:100}, unit:'%', reticle:{w:0.36,h:0.16} },
+];
+
+/* =========================================================
+   STATE
+   ========================================================= */
+let stream = null;
+let activeField = null;
+let sessionLog = [];
+let scanning = false;
+let busy = false;         // guards against overlapping OCR calls
+let recentReads = [];     // last couple of validated parses, for the consistency check
+let locked = false;
+
+const video = document.getElementById("video");
+const cameraStage = document.getElementById("cameraStage");
+const pickerScreen = document.getElementById("pickerScreen");
+const stepText = document.getElementById("stepText");
+const reticle = document.getElementById("reticle");
+const liveRead = document.getElementById("liveRead");
+const liveReadLabel = document.getElementById("liveReadLabel");
+const liveReadVals = document.getElementById("liveReadVals");
+const frameBadge = document.getElementById("frameBadge");
+const toast = document.getElementById("toast");
+const reviewSheet = document.getElementById("reviewSheet");
+const reviewBody = document.getElementById("reviewBody");
+const logSheet = document.getElementById("logSheet");
+const logBody = document.getElementById("logBody");
+const btnViewLog = document.getElementById("btnViewLog");
+
+/* =========================================================
+   FIELD PICKER UI
+   ========================================================= */
+function renderPicker(){
+  const groups = {};
+  FIELD_DEFS.forEach(f=>{ (groups[f.panel] = groups[f.panel]||[]).push(f); });
+  const list = document.getElementById("pickerList");
+  list.innerHTML = Object.keys(groups).map(panel=>{
+    const items = groups[panel].map(f=>`
+      <button class="field-btn" data-field="${f.id}">
+        <span>
+          <span class="fname">${f.label}</span>
+          <span class="fmeta">${f.sub}${f.spec ? " · spec " + (f.spec.min!=null?f.spec.min+"–":"") + (f.spec.max!=null?f.spec.max:"") + " " + f.unit : ""}</span>
+        </span>
+        <span class="fcount">${f.count}×</span>
+      </button>
+    `).join("");
+    return `<div class="panel-group"><h3>${panel}</h3>${items}</div>`;
+  }).join("");
+  list.querySelectorAll(".field-btn").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      const f = FIELD_DEFS.find(x=>x.id===btn.getAttribute("data-field"));
+      startFieldCapture(f);
+    });
+  });
+}
+renderPicker();
+
+/* =========================================================
+   CAMERA + RETICLE
+   ========================================================= */
+async function startFieldCapture(field){
+  activeField = field;
+  recentReads = [];
+  locked = false;
+  try{
+    if(!stream){
+      stream = await navigator.mediaDevices.getUserMedia({
+        video:{ facingMode:{ ideal:"environment" }, width:{ideal:1920}, height:{ideal:1080} },
+        audio:false
+      });
+      video.srcObject = stream;
+    }
+    pickerScreen.classList.remove("active");
+    cameraStage.classList.add("active");
+    sizeReticle();
+    updateHud();
+    reticle.classList.remove("locking","locked");
+    liveRead.classList.remove("locked");
+    liveReadLabel.textContent = field.label;
+    liveReadVals.textContent = "scanning…";
+    frameBadge.textContent = field.label;
+    frameBadge.classList.remove("on");
+    scanning = true;
+    scanLoop();
+  }catch(err){
+    alert("Couldn't open the camera: " + (err && err.message ? err.message : err) + "\n\nOn Android Chrome this usually means the page needs to be served over https:// or localhost — a plain file:// open is blocked for camera access.");
+    pickerScreen.classList.add("active");
+    cameraStage.classList.remove("active");
+  }
+}
+
+function sizeReticle(){
+  const cw = cameraStage.clientWidth, ch = cameraStage.clientHeight;
+  const w = cw * activeField.reticle.w, h = ch * activeField.reticle.h;
+  reticle.style.width = w + "px";
+  reticle.style.height = h + "px";
+}
+window.addEventListener("resize", ()=>{ if(activeField) sizeReticle(); });
+
+function updateHud(){
+  stepText.textContent = `Align the box over ${activeField.label.toLowerCase()} (${activeField.count} value${activeField.count>1?'s':''} expected)`;
+}
+
+function stopCamera(){
+  scanning = false;
+  if(stream){ stream.getTracks().forEach(t=>t.stop()); stream = null; }
+  cameraStage.classList.remove("active");
+  pickerScreen.classList.add("active");
+}
+document.getElementById("btnCloseCamera").addEventListener("click", stopCamera);
+
+/* =========================================================
+   CROP from the reticle's on-screen rect, mapped to the
+   video's native pixel coordinates (object-fit:cover math).
+   ========================================================= */
+function cropReticle(){
+  const rBox = reticle.getBoundingClientRect();
+  const stageBox = cameraStage.getBoundingClientRect();
+  const box = { x: rBox.left - stageBox.left, y: rBox.top - stageBox.top, w: rBox.width, h: rBox.height };
+
+  const vw = video.videoWidth, vh = video.videoHeight;
+  const cw = stageBox.width, ch = stageBox.height;
+  const scale = Math.max(cw/vw, ch/vh);
+  const dispW = vw*scale, dispH = vh*scale;
+  const offX = (cw-dispW)/2, offY = (ch-dispH)/2;
+  const sx = (box.x - offX)/scale, sy = (box.y - offY)/scale;
+  const sw = box.w/scale, sh = box.h/scale;
+
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(sw));
+  canvas.height = Math.max(1, Math.round(sh));
+  const ctx = canvas.getContext("2d");
+  ctx.drawImage(video, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
+  return canvas;
+}
+
+/* =========================================================
+   OCR + PARSE + VALIDATE
+   ========================================================= */
+let ocrWorker = null;
+async function ensureWorker(){
+  if(ocrWorker) return ocrWorker;
+  ocrWorker = await Tesseract.createWorker("eng");
+  return ocrWorker;
+}
+
+function parseNumbers(text){
+  const matches = text.match(/-?\d+\.?\d*/g) || [];
+  return matches.map(Number).filter(n=>!isNaN(n));
+}
+
+function validateAgainstField(numbers, field){
+  if(numbers.length < field.count) return null;
+  // take the first N plausible numbers — good enough for a fixed reticle
+  // tightly framing just the target row
+  const candidate = numbers.slice(0, field.count);
+  if(field.spec){
+    const ok = candidate.every(n=>{
+      const minOk = field.spec.min==null || n >= field.spec.min;
+      const maxOk = field.spec.max==null || n <= field.spec.max;
+      return minOk && maxOk;
+    });
+    if(!ok) return null;
+  }
+  return candidate;
+}
+
+function readsConsistent(a, b, tolPct){
+  if(!a || !b || a.length !== b.length) return false;
+  return a.every((v,i)=>{
+    const tol = Math.max(0.5, Math.abs(v)*tolPct);
+    return Math.abs(v - b[i]) <= tol;
+  });
+}
+
+/* =========================================================
+   SCAN LOOP — recognizes the reticle crop repeatedly, checks
+   each read against the field's spec, and locks once two
+   consecutive reads agree closely enough to trust.
+   ========================================================= */
+async function scanLoop(){
+  if(!scanning || locked){ return; }
+  if(busy){ requestAnimationFrame(()=>setTimeout(scanLoop, 50)); return; }
+  busy = true;
+  try{
+    const canvas = cropReticle();
+    const worker = await ensureWorker();
+    const { data } = await worker.recognize(canvas);
+    const numbers = parseNumbers(data.text || "");
+    const candidate = validateAgainstField(numbers, activeField);
+
+    if(candidate){
+      liveReadVals.textContent = candidate.map(n=>n.toFixed(1)).join(" / ") + " " + activeField.unit;
+      reticle.classList.add("locking");
+      frameBadge.classList.add("on");
+
+      const prev = recentReads[recentReads.length-1];
+      if(prev && readsConsistent(prev, candidate, 0.02)){
+        recentReads.push(candidate);
+      } else {
+        recentReads = [candidate];
+      }
+
+      if(recentReads.length >= 2){
+        lockReading(candidate);
+        busy = false;
+        return;
+      }
+    } else {
+      liveReadVals.textContent = numbers.length ? "no match…" : "…";
+      reticle.classList.remove("locking");
+      frameBadge.classList.remove("on");
+      recentReads = [];
+    }
+  }catch(e){
+    console.error(e);
+  }
+  busy = false;
+  if(scanning && !locked) setTimeout(scanLoop, 400);
+}
+
+function lockReading(values){
+  locked = true;
+  scanning = false;
+  reticle.classList.remove("locking");
+  reticle.classList.add("locked");
+  liveRead.classList.add("locked");
+  liveReadVals.textContent = values.map(n=>n.toFixed(1)).join(" / ") + " " + activeField.unit;
+  if(navigator.vibrate) navigator.vibrate(60);
+  showToast("Captured ✓ " + activeField.label);
+  saveReading(activeField, values, "auto");
+  setTimeout(()=>{
+    stopCamera();
+  }, 900);
+}
+
+function showToast(msg){
+  toast.textContent = msg;
+  toast.classList.add("show");
+  setTimeout(()=>toast.classList.remove("show"), 1400);
+}
+
+/* =========================================================
+   MANUAL FALLBACK — grabs the current frame regardless of
+   confidence, and opens an editable form pre-filled with
+   whatever numbers were parsed (blank if none), so the tech
+   can type the correct values by hand when auto-lock can't
+   get a clean read (glare, odd angle, etc).
+   ========================================================= */
+document.getElementById("btnManualCapture").addEventListener("click", async ()=>{
+  scanning = false;
+  const canvas = cropReticle();
+  let numbers = [];
+  let rawText = "";
+  try{
+    const worker = await ensureWorker();
+    const { data } = await worker.recognize(canvas);
+    rawText = data.text || "";
+    numbers = parseNumbers(rawText);
+  }catch(e){ console.error(e); }
+  openReview(canvas, numbers, rawText);
+});
+
+function openReview(canvas, numbers, rawText){
+  const f = activeField;
+  let html = `<img class="crop-preview" src="${canvas.toDataURL('image/jpeg',0.9)}" alt="Captured crop">`;
+  html += `<div class="field-inputs">`;
+  for(let i=0;i<f.count;i++){
+    const val = numbers[i] != null ? numbers[i] : "";
+    html += `<div class="fi"><label>${f.count>1 ? "Value "+(i+1) : f.label}</label><input type="text" data-i="${i}" value="${val}"></div>`;
+  }
+  html += `</div>`;
+  html += `<div class="raw-text-box">${(rawText||"(no text recognized)").trim()}</div>`;
+  reviewBody.innerHTML = html;
+  reviewSheet.classList.add("active");
+  reviewSheet._canvas = canvas;
+}
+
+document.getElementById("btnCancelReview").addEventListener("click", ()=>{
+  reviewSheet.classList.remove("active");
+  scanning = true;
+  recentReads = [];
+  scanLoop();
+});
+document.getElementById("btnRetake").addEventListener("click", ()=>{
+  reviewSheet.classList.remove("active");
+  scanning = true;
+  recentReads = [];
+  scanLoop();
+});
+document.getElementById("btnConfirmReading").addEventListener("click", ()=>{
+  const inputs = reviewBody.querySelectorAll("input[data-i]");
+  const values = Array.from(inputs).map(inp => parseFloat(inp.value)).map(n=>isNaN(n)?null:n);
+  reviewSheet.classList.remove("active");
+  saveReading(activeField, values, "manual");
+  stopCamera();
+});
+
+/* =========================================================
+   SESSION LOG
+   ========================================================= */
+function saveReading(field, values, source){
+  sessionLog.unshift({
+    time: new Date().toLocaleTimeString(),
+    field: field.label,
+    panel: field.panel,
+    values, unit: field.unit, source
+  });
+  btnViewLog.style.display = "block";
+}
+
+btnViewLog.addEventListener("click", ()=>{ renderLog(); logSheet.classList.add("active"); });
+document.getElementById("btnCloseLog").addEventListener("click", ()=> logSheet.classList.remove("active"));
+
+function renderLog(){
+  if(sessionLog.length === 0){
+    logBody.innerHTML = `<div class="empty-note">No readings captured yet.</div>`;
+    return;
+  }
+  logBody.innerHTML = sessionLog.map(entry=>{
+    const valsText = entry.values.map(v=> v==null ? "—" : v).join(" / ");
+    return `<div class="log-entry">
+      <div class="tag">${entry.time} · ${entry.panel}</div>
+      <div class="vals">${entry.field}: ${valsText} ${entry.unit}</div>
+      <div class="src">source: ${entry.source}</div>
+    </div>`;
+  }).join("");
+}
+
+})();
+</script>
+</body>
+</html>
