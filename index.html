@@ -4792,7 +4792,10 @@ function confirmAndApplyBackup(backup, sourceLabel, onApplied){
       if(!STATE.meta) STATE.meta = { nextRoomNum: computeNextRoomNum() };
       if(!STATE.techRoster || !STATE.techRoster.length) STATE.techRoster = DEFAULT_TECH_ROSTER.slice();
       ensureBatteryBanksOnState();
-      if(backup.assets && typeof backup.assets==="object"){ Object.assign(ASSETS, backup.assets); saveAssets(); }   // merge, never wipe existing details
+      if(backup.assets && typeof backup.assets==="object"){
+        Object.assign(ASSETS, backup.assets); saveAssets();   // merge, never wipe existing details
+        try{ if(Object.keys(backup.assets).some(k=>backup.assets[k] && (backup.assets[k].pmsDue || backup.assets[k].pmsLast))) window.localStorage.setItem("mups_pms_plan_asked_v2", "1"); }catch(e){}   // V11_34: restored PMS data must never be offered the Excel plan again
+      }
       if(window.MIMIC&&window.MIMIC.importOv&&backup.mimic) window.MIMIC.importOv(backup.mimic);   // V11_23
       if(window.__migrateRenames) window.__migrateRenames();                                       // V11_23
       mergeLinks(backup.links);                                                                                        // add links we don't have yet; keep ours
@@ -4800,6 +4803,7 @@ function confirmAndApplyBackup(backup, sourceLabel, onApplied){
       logAudit(null, `Imported backup${sourceLabel?" ("+sourceLabel+")":""} from ${new Date(backup.exportedAt).toLocaleString()}.`);
       renderAll();
       scheduleSave();
+      try{ document.dispatchEvent(new Event("assets-changed")); }catch(e){}     // V11_34: refresh the PMS indicator, chips and unit icons from the restored data
       if(VIEW==="dashboard") renderDashboard();
       if(onApplied) onApplied();
     }
@@ -5918,18 +5922,28 @@ const PMS_ALIAS = {"MUPS19A":"MUPS13A","MUPS20A":"MUPS14A","MUPS23A":"MUPS15A","
 function pmsKey(n){ const k = String(n||"").replace(/\(.*?\)/g,"").toUpperCase().replace(/[^A-Z0-9]/g,""); return PMS_ALIAS[k] || k; }
 const PMS_IDX = (function(){ const o = {}; Object.keys(PMS_PLAN).forEach(k=>{ o[pmsKey(k)] = k; }); return o; })();
 function pmsPlanFor(name){ const k = PMS_IDX[pmsKey(name)]; return k ? { key:k, p:PMS_PLAN[k] } : null; }
-function pmsApplyPlan(){
+function pmsApplyPlan(mode){
+  const overwrite = mode === "all";
   const today = pmsToday(), usedPlan = new Set(), applied = [], notInExcel = [];
+  let filled = 0, kept = 0;
   allUnits().forEach(u=>{
     if(!u.roomKey) return;
     const hit = pmsPlanFor(u.name);
     if(!hit){ notInExcel.push(u.name); return; }
-    const p = hit.p, key = assetKey(u.name);
-    const a = ASSETS[key] || (ASSETS[key] = {});
-    a.pmsFreq = "monthly"; a.pmsType = "non-intrusive"; a.pmsBatt = p.t === "UPS";
-    a.pmsMD = p.md.slice(); a.pmsMD26 = Object.assign({}, p.m26); a.pmsAnnual = p.an || 0;
-    a.pmsDue = pmsPlanNext(a, today, true) || a.pmsDue || ""; a.updated = new Date().toISOString();
-    usedPlan.add(hit.key); applied.push(u.name);
+    const p = hit.p, key = assetKey(u.name), a = ASSETS[key] || (ASSETS[key] = {});
+    const hasDate = !!(a.pmsDue || a.pmsLast);
+    if(hasDate && !overwrite){
+      kept++;      /* keep this unit's own due date, history and settings; only add the plan dates it is missing */
+      if(!(a.pmsMD||[]).some(Boolean)){ a.pmsMD = p.md.slice(); a.pmsMD26 = Object.assign({}, p.m26); }
+      if(!a.pmsAnnual) a.pmsAnnual = p.an || 0;
+      if(!a.pmsFreq) a.pmsFreq = "monthly"; if(!a.pmsType) a.pmsType = "non-intrusive"; if(a.pmsBatt === undefined) a.pmsBatt = p.t === "UPS";
+    } else {
+      filled++;
+      a.pmsFreq = "monthly"; a.pmsType = "non-intrusive"; a.pmsBatt = p.t === "UPS";
+      a.pmsMD = p.md.slice(); a.pmsMD26 = Object.assign({}, p.m26); a.pmsAnnual = p.an || 0;
+      a.pmsDue = pmsPlanNext(a, today, true) || a.pmsDue || "";
+    }
+    a.updated = new Date().toISOString(); usedPlan.add(hit.key); applied.push(u.name);
   });
   const missing = Object.keys(PMS_PLAN).filter(k=>!usedPlan.has(k));
   if(!applied.length){
@@ -5937,21 +5951,28 @@ function pmsApplyPlan(){
     return;
   }
   if(!saveAssets()){ showInfoModal("Couldn't save","Browser storage is full or blocked."); return; }
-  try{ logAudit(null, `PMS plan applied to ${applied.length} unit(s).`); anCount("pms_plan"); }catch(e){}
+  try{ logAudit(null, `PMS plan applied (${overwrite ? "overwrite all" : "fill empty only"}): ${filled} set from the Excel, ${kept} kept as they were.`); anCount("pms_plan"); }catch(e){}
   try{ window.localStorage.setItem(PMS_ASK_KEY, "1"); }catch(e){}
   document.dispatchEvent(new Event("assets-changed"));
   try{ renderAll(); }catch(e){}
-  showInfoModal("PMS plan applied", `<b>${applied.length}</b> units now have their next PMS date (monthly, non-intrusive; battery test on UPS only; annual month marked). It also shows as a 🛠 date next to each unit in the readings tables.`
+  showInfoModal("PMS plan applied", `<b>${filled}</b> unit(s) got their next PMS date from the Excel (monthly, non-intrusive; battery test on UPS only; annual month marked).`
+    + (kept ? `<br><b>${kept}</b> unit(s) already had their own PMS date and were left exactly as they were.` : "")
     + (missing.length ? `<br><br>In the Excel but not in this app (skipped): ${missing.map(escH).join(", ")}.` : "")
     + (notInExcel.length ? `<br><br>In this app but not in the Excel: ${notInExcel.map(escH).join(", ")}.` : ""));
 }
 function pmsAskApply(){
-  const n = allUnits().filter(u=>u.roomKey && pmsPlanFor(u.name)).length;
+  const units = allUnits().filter(u=>u.roomKey && pmsPlanFor(u.name)), n = units.length;
   if(!n){
     showInfoModal("No matching units", "None of this app's unit names match the PMS Excel.<br><br>Names in this app: " + (allUnits().filter(u=>u.roomKey).map(u=>escH(u.name)).join(", ") || "none") + ".");
     return;
   }
-  showConfirmModal("Apply PMS plan from Excel?", `Sets the next PMS date for <b>${n}</b> matching UPS/STS from your 52-week plan: monthly, non-intrusive, battery test on UPS only, annual month marked. Month and day repeat every year (only the year changes). This overwrites the PMS dates on those units; MOP links and history are kept.`, "Apply plan", pmsApplyPlan);
+  const have = units.filter(u=>{ const a = getAsset(u.name); return a && (a.pmsDue || a.pmsLast); }).length;
+  let close = ()=>{};
+  close = showModal("Apply PMS plan from Excel?",
+    `<b>${n}</b> units match your 52-week plan (monthly, non-intrusive, battery test on UPS only, annual month marked; month and day repeat every year).` +
+    (have ? `<br><br><b>${have}</b> of them already have a PMS date or history on this device. <b>Fill empty units only</b> keeps those exactly as they are. <b>Overwrite all</b> resets them to the Excel plan and loses their recorded PMS progress.` : ""),
+    [ { label: have ? "✔ Fill empty units only (keep my dates)" : "✔ Apply plan", cls:"primary", onClick: ()=>{ close(); pmsApplyPlan("fill"); } },
+      ...(have ? [ { label: "⚠ Overwrite all with the Excel plan", cls:"warn", onClick: ()=>{ close(); pmsApplyPlan("all"); } } ] : []) ]);
 }
 /* small 🛠 date chip next to every unit in the readings tables */
 const PMS_MON = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
@@ -6058,9 +6079,10 @@ function pmsInit(){
     try{ if(window.localStorage.getItem(PMS_ASK_KEY)) return; }catch(e){}
     if(document.querySelector(".modal-backdrop")){ if(tries < 4) setTimeout(()=>offer(tries+1), 6000); return; }
     const n = allUnits().filter(u=>u.roomKey && pmsPlanFor(u.name)).length; if(!n) return;
+    if(allUnits().some(u=>{ const a = getAsset(u.name); return a && (a.pmsDue || a.pmsLast); })){ try{ window.localStorage.setItem(PMS_ASK_KEY, "1"); }catch(e){} return; }   // data already here (e.g. restored from GitHub): never offer the Excel plan over it
     let close = ()=>{};
     close = showModal("Set up the PMS schedule?", `Your 52-week PMS plan from the Excel is built into this version. Apply it now to the <b>${n}</b> matching UPS/STS? Each unit gets its next PMS date (monthly, non-intrusive, battery test on UPS only, annual month marked).`, [
-      { label:"✔ Apply plan now", cls:"primary", onClick: ()=>{ close(); pmsApplyPlan(); } },
+      { label:"✔ Apply plan now", cls:"primary", onClick: ()=>{ close(); pmsApplyPlan("fill"); } },
       { label:"Don't ask again", cls:"ghost", onClick: ()=>{ try{ window.localStorage.setItem(PMS_ASK_KEY, "1"); }catch(e){} close(); } }
     ]);
   };
@@ -6608,10 +6630,10 @@ async function ghUploadFlow(force){
 }
 /* ---- automatic upload ---- */
 function ghMarkDirty(){ if(!GH.dirty){ GH.dirty = true; ghSave(); } ghSchedule(GH_DEBOUNCE); }
-function ghSchedule(ms){
+function ghSchedule(ms, urgent){
   clearTimeout(ghTimer); if(!GH.auto || !ghConfigured() || !GH.dirty) return;
   const since = GH.lastUpload ? Date.now() - new Date(GH.lastUpload).getTime() : Infinity;
-  ghTimer = setTimeout(ghAutoRun, Math.max(ms, GH_MIN_GAP - since));
+  ghTimer = setTimeout(ghAutoRun, urgent ? ms : Math.max(ms, GH_MIN_GAP - since));   // V11_35: urgent = skip the 10-minute spacing
 }
 async function ghAutoRun(){
   if(!GH.auto || !GH.dirty || !ghConfigured() || GH.remoteNewer || !navigator.onLine) return;       // 'online' event re-arms it
@@ -6641,7 +6663,7 @@ document.addEventListener("visibilitychange", ()=>{
     if(GH.auto && GH.dirty && since > 60000){ clearTimeout(ghTimer); ghAutoRun(); }                 // best effort when the app is backgrounded
   } else ghCheckRemote();
 });
-document.addEventListener("assets-changed", ()=>{ if(typeof ghMarkDirty==="function") ghMarkDirty(); });
+document.addEventListener("assets-changed", ()=>{ if(typeof ghMarkDirty==="function"){ ghMarkDirty(); ghSchedule(20000, true); } });   // V11_35: PMS / unit-detail changes are rare and important — upload within ~20 s, not up to 10 min
 /* ---- banner ---- */
 function ghShowBanner(){
   const el = document.getElementById("ghBanner"); if(!el) return;
@@ -6887,7 +6909,7 @@ setTimeout(tgFlushQueue, 4000);
       private chat. Nothing is shown in the app except the hidden
       developer panel (tap the app name 7 times).
    ========================================================= */
-const APP_VERSION = "V11_33";
+const APP_VERSION = "V11_35";
 
 /* >>> DEVELOPER: create a SEPARATE bot in @BotFather just for these reports,
        press Start on it, then paste its token and your own chat ID here. <<<
