@@ -1081,6 +1081,7 @@
   .ul-item.hot{ background:var(--panel-3); border-color:var(--amber); transform:scale(1.1); }
   @keyframes ulpop{ from{ opacity:0; transform:scale(.85); } to{ opacity:1; transform:scale(1); } }
   @media (prefers-reduced-motion: reduce){ .unitlaunch.due, .ul-item.due{ animation:none; } }
+  .mm-prefdot{ display:inline-block; width:8px; height:8px; border-radius:50%; background:#000; border:2px solid #fff; box-shadow:0 0 0 1px var(--text-faint); vertical-align:middle; margin-right:5px; box-sizing:content-box; }
   .pms-btns{ display:flex; gap:4px; flex:none; } .pms-btns .btn{ min-height:36px; padding:4px 9px; }
   .pms-mini{ display:inline-flex; align-items:center; justify-content:center; min-width:36px; min-height:36px; text-decoration:none; }
   .lastedit{ font-family:var(--font-mono); font-size:10.5px; color:var(--text-faint); margin-left:auto; white-space:nowrap; align-self:center; }
@@ -6909,7 +6910,7 @@ setTimeout(tgFlushQueue, 4000);
       private chat. Nothing is shown in the app except the hidden
       developer panel (tap the app name 7 times).
    ========================================================= */
-const APP_VERSION = "V11_35";
+const APP_VERSION = "V11_36";
 
 /* >>> DEVELOPER: create a SEPARATE bot in @BotFather just for these reports,
        press Start on it, then paste its token and your own chat ID here. <<<
@@ -7309,7 +7310,10 @@ const STS_RAW = [
  ["STS-7B",400,"4",UB+"HL SOUTH-01","ZONE D","B2","B3","B",1],
  ["STS-8B",400,"4",UB+"ZONE A-02","ZONE A & B","B3","B1","B",1]
 ];
-const STS = STS_RAW.map(r=>({id:r[0],amps:r[1],room:r[2],dp:r[3],zone:r[4],s1:r[5],s2:r[6],side:r[7],vf:!!r[8]}));
+/* preferred source = the black dot beside S1 or S2 on the "UPS & STS at Group-A As-Built" drawing (rooms 1, 2, 3 & 5) */
+const STS_PREF = {"STS-1A":"S2","STS-2A":"S2","STS-3A":"S1","STS-4A":"S1","STS-5A":"S1","STS-6A":"S2","STS-7A":"S2","STS-8A":"S2","STS-9A":"S1","STS-10A":"S1","STS-11A":"S1",
+  "STS-12A":"S1","STS-13A":"S2","STS-14A":"S1","STS-15A":"S1","STS-16A":"S2","STS-17A":"S2","STS-18A":"S1","STS-19A":"S1","STS-20A":"S1","STS-21A":"S1","STS-22A":"S1"};
+const STS = STS_RAW.map(r=>({id:r[0],amps:r[1],room:r[2],dp:r[3],zone:r[4],s1:r[5],s2:r[6],side:r[7],vf:!!r[8],pref:STS_PREF[r[0]]||""}));
 const DC = [
   {id:"DC PANEL A", side:"A", name:"UPS PANEL A", dp:"DP-UPS-LGF-GA-DC-01",  site:"Main Data Center 1",     mdp:"M7"},
   {id:"DC PANEL B", side:"A", name:"UPS PANEL B", dp:"DP-UPS-LGF-GA-DC-02",  site:"Main Data Center 1",     mdp:"M8"},
@@ -7383,7 +7387,7 @@ let side="A";
 const bySide=a=>a.filter(x=>x.side===side||(x.also&&x.also.indexOf(side)>-1));
 const legacy=n=>RENAMES[String(n||"").trim().toUpperCase()]||n;
 const upsMdp=id=>ov.ups[id]||UPS.find(u=>u.id===id).mdp;
-function stsSrc(s){ const o=ov.sts[s.id]||{}; return {s1:o.s1||s.s1, s2:o.s2||s.s2, ok:(o.ok===undefined?!!s.vf:!!o.ok)}; }
+function stsSrc(s){ const o=ov.sts[s.id]||{}; return {s1:o.s1||s.s1, s2:o.s2||s.s2, ok:(o.ok===undefined?!!s.vf:!!o.ok), pref:(o.pref===undefined?s.pref:o.pref)}; }
 const upsOfMdp=m=>UPS.filter(u=>upsMdp(u.id)===m).map(u=>u.id);
 const stsOfMdp=m=>STS.filter(s=>{const x=stsSrc(s);return x.s1===m||x.s2===m;});
 const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -7619,6 +7623,10 @@ function draw(){
     s+=load(POS["S:"+t.id],t.dp,t.zone,has&&!T.nodes.has("S:"+t.id),!stsSrc(t).ok); });
   bySide(DC).forEach(d=>{ s+=nodeSvg("D:"+d.id,cl("D:"+d.id),[d.name]);
     s+=load(POS["D:"+d.id],d.dp,d.site,has&&!T.nodes.has("D:"+d.id),false,true); });
+  /* preferred-source dot: black bullseye on the preferred input (S1 or S2) of each STS, like the as-built drawing */
+  LINKS.forEach(l=>{ if(l.k!=="m2s") return; const t=STS.find(z=>z.id===l.sts); if(!t || stsSrc(t).pref!==l.src) return;
+    const cx=l.x2+7, cy=l.y2, o=(has&&!T.nodes.has("S:"+t.id)) ? .35 : 1;
+    s+='<g style="pointer-events:none;opacity:'+o+'"><title>Preferred source '+l.src+'</title><circle cx="'+cx+'" cy="'+cy+'" r="3.7" fill="#000" stroke="#fff" stroke-width="1.1"/><circle cx="'+cx+'" cy="'+cy+'" r="1" fill="#fff"/></g>'; });
   const svg=document.getElementById("mmSvg");
   svg.setAttribute("viewBox","0 0 "+W+" "+H); svg.innerHTML=s; svg.style.width=zoom+"px";
   document.querySelectorAll(".mm-side").forEach(b=>b.classList.toggle("on",b.dataset.side===side));
@@ -7647,7 +7655,7 @@ function drawCard(){
     const unv=bySide(STS).filter(s=>!stsSrc(s).ok).length, tot=bySide(STS).length;
     c.innerHTML='<h3>'+(side==="A"?"Group-A":"Group-B")+' · tap any equipment to trace its power path</h3>'
       +'<div class="sub">UPS → MDP → STS / data-center panels. Selected path animates; the dotted lines show the other source of each STS. Each STS is wired straight to the serving-load DP written beside it. Double-tap the diagram for full screen, double-tap again to return.</div>'
-      +'<div class="mm-legend"><span><i style="border-top-style:solid"></i>S1 / feed</span><span><i style="border-top-style:dashed"></i>other source</span>'
+      +'<div class="mm-legend"><span><i style="border-top-style:solid"></i>S1 / feed</span><span><i style="border-top-style:dashed"></i>other source</span><span><b class="mm-prefdot"></b>preferred source</span>'
       +'<span style="color:var(--green)">● in spec</span><span style="color:var(--red)">▲ out of spec</span><span style="color:var(--amber)">◆ advisory</span><span>○ no reading</span></div>'
       +(unv?'<div class="mm-row"><span class="mm-pill draft">⚠ '+unv+' of '+tot+' STS source assignments are still DRAFT</span></div><div class="sub">Confirm each against the as-built and tick “Verified” in its Edit panel. Nodes without a ⚠ are confirmed.</div>':"");
     return;
@@ -7660,7 +7668,7 @@ function drawCard(){
     h+='<h3>'+esc(u.id)+' '+pill(L.st)+'</h3><div class="sub">'+u.kva+' kVA UPS · parallel pair with '+(partner.length?esc(partner.join(", ")):"none")+'</div>';
     h+='<div class="mm-row"><b>Output to</b>'+mdpChips(mid)+'</div>';
     h+=inputRow(u.id);
-    h+='<div class="mm-row"><b>Then feeds STS</b>'+(fed.length?fed.map(s=>{const x=stsSrc(s);return chip("S",s.id,s.id+(x.s1===mid?" · S1":" · S2"),x.s1===mid?"":"s2");}).join(""):"—")+'</div>';
+    h+='<div class="mm-row"><b>Then feeds STS</b>'+(fed.length?fed.map(s=>{const x=stsSrc(s), one=x.s1===mid;return chip("S",s.id,s.id+(one?" · S1":" · S2")+(x.pref===(one?"S1":"S2")?" ●":""),one?"":"s2");}).join(""):"—")+'</div>';
     if(dcs.length) h+='<div class="mm-row"><b>Data center</b>'+dcs.map(d=>chip("D",d.id,d.name+" ("+d.site+")")).join("")+'</div>';
     h+=liveBlock("ups",u.id,L);
     h+=editUps(u.id,mid);
@@ -7697,13 +7705,13 @@ function drawCard(){
     h+='<h3>'+esc(m.pre)+' '+esc(m.n)+' '+pill(ST["M:"+m.id].st)+'</h3><div class="sub">Located in UPS Room '+esc(m.room)+' · fed by '+ups.length+' UPS in parallel'+(m.grp?' ('+m.grp+')':'')+'</div>';
     h+=mdpInputRow(m.id);
     h+='<div class="mm-row"><b>Fed by UPS</b>'+ups.map(u=>chip("U",u)).join("")+'</div>';
-    h+='<div class="mm-row"><b>Feeds STS</b>'+(fed.length?fed.map(s=>{const x=stsSrc(s);return chip("S",s.id,s.id+(x.s1===m.id?" · S1":" · S2"),x.s1===m.id?"":"s2");}).join(""):"—")+'</div>';
+    h+='<div class="mm-row"><b>Feeds STS</b>'+(fed.length?fed.map(s=>{const x=stsSrc(s), one=x.s1===m.id;return chip("S",s.id,s.id+(one?" · S1":" · S2")+(x.pref===(one?"S1":"S2")?" ●":""),one?"":"s2");}).join(""):"—")+'</div>';
     if(dcs.length) h+='<div class="mm-row"><b>Data center</b>'+dcs.map(d=>chip("D",d.id,d.name)).join("")+'</div>';
   } else if(sel.t==="S"){
     const s=STS.find(x=>x.id===sel.id), x=stsSrc(s), L=ST["S:"+s.id];
     h+='<h3>'+esc(s.id)+' '+pill(L.st)+(x.ok?'':' <span class="mm-pill draft">⚠ DRAFT SOURCES</span>')+'</h3><div class="sub">'+s.amps+' A STS · located in UPS Room '+esc(s.room)+'</div>';
-    h+='<div class="mm-row"><b>Source 1</b>'+mdpChips(x.s1)+'<span style="color:var(--text-dim)">← '+upsOfMdp(x.s1).map(esc).join(" + ")+'</span></div>';
-    h+='<div class="mm-row"><b>Source 2</b>'+mdpChips(x.s2)+'<span style="color:var(--text-dim)">← '+upsOfMdp(x.s2).map(esc).join(" + ")+'</span></div>';
+    h+='<div class="mm-row"><b>Source 1</b>'+mdpChips(x.s1)+'<span style="color:var(--text-dim)">← '+upsOfMdp(x.s1).map(esc).join(" + ")+'</span>'+(x.pref==="S1"?'<span class="mm-pill"><b class="mm-prefdot"></b>preferred</span>':"")+'</div>';
+    h+='<div class="mm-row"><b>Source 2</b>'+mdpChips(x.s2)+'<span style="color:var(--text-dim)">← '+upsOfMdp(x.s2).map(esc).join(" + ")+'</span>'+(x.pref==="S2"?'<span class="mm-pill"><b class="mm-prefdot"></b>preferred</span>':"")+'</div>';
     h+='<div class="mm-row"><b>Serving load</b><span><span style="color:var(--text);font-size:12px">'+esc(s.dp)+'</span> · '+esc(s.zone)+' <span style="color:var(--text-faint)">(direct connection)</span></span></div>';
     h+=liveBlock("sts",s.id,L);
     h+=editSts(s,x);
@@ -7745,6 +7753,7 @@ function editSts(s,x){
   return '<div class="mm-row"><button class="btn ghost" data-act="edit">✎ Edit sources</button></div>'
    +'<div class="mm-edit'+(editing?" open":"")+'"><div class="mm-row"><b>Source 1</b><select data-ed="s1" data-id="'+s.id+'">'+mdpOptions(x.s1)+'</select></div>'
    +'<div class="mm-row"><b>Source 2</b><select data-ed="s2" data-id="'+s.id+'">'+mdpOptions(x.s2)+'</select></div>'
+   +'<div class="mm-row"><b>Preferred source</b><select data-ed="pref" data-id="'+s.id+'"><option value=""'+(!x.pref?" selected":"")+'>— none —</option><option value="S1"'+(x.pref==="S1"?" selected":"")+'>Source 1</option><option value="S2"'+(x.pref==="S2"?" selected":"")+'>Source 2</option></select></div>'
    +'<div class="mm-row"><label style="display:flex;gap:6px;align-items:center"><input type="checkbox" data-ed="ok" data-id="'+s.id+'"'+(x.ok?" checked":"")+'> Verified against as-built</label>'
    +'<button class="btn ghost" data-act="reset">Reset to drawing</button></div></div>';
 }
