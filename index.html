@@ -1082,6 +1082,9 @@
   @keyframes ulpop{ from{ opacity:0; transform:scale(.85); } to{ opacity:1; transform:scale(1); } }
   @media (prefers-reduced-motion: reduce){ .unitlaunch.due, .ul-item.due{ animation:none; } }
   .mm-prefdot{ display:inline-block; width:8px; height:8px; border-radius:50%; background:#000; border:2px solid #fff; box-shadow:0 0 0 1px var(--text-faint); vertical-align:middle; margin-right:5px; box-sizing:content-box; }
+  #mmMec.on{ border-color:var(--amber); color:var(--amber); }
+  .mm-node.ext rect.box{ stroke-dasharray:3 3; opacity:.7; }
+  .mm-node.dim{ opacity:.28; }
   .pms-btns{ display:flex; gap:4px; flex:none; } .pms-btns .btn{ min-height:36px; padding:4px 9px; }
   .pms-mini{ display:inline-flex; align-items:center; justify-content:center; min-width:36px; min-height:36px; text-decoration:none; }
   .lastedit{ font-family:var(--font-mono); font-size:10.5px; color:var(--text-faint); margin-left:auto; white-space:nowrap; align-self:center; }
@@ -6910,7 +6913,7 @@ setTimeout(tgFlushQueue, 4000);
       private chat. Nothing is shown in the app except the hidden
       developer panel (tap the app name 7 times).
    ========================================================= */
-const APP_VERSION = "V11_36";
+const APP_VERSION = "V11_37";
 
 /* >>> DEVELOPER: create a SEPARATE bot in @BotFather just for these reports,
        press Start on it, then paste its token and your own chat ID here. <<<
@@ -7517,7 +7520,7 @@ function computeStatus(){
 }
 
 /* ---------- selection / trace ---------- */
-let sel=null, zoom=1250, editing=false;
+let sel=null, zoom=1250, editing=false, mode="path", msel=null;   // mode: "path" (power path) or "mec" (substation)
 function trace(){
   const nodes=new Set(), on=new Set(), ctx=new Set(); const L=LINKS;
   if(!sel) return {nodes,on,ctx};
@@ -7583,6 +7586,8 @@ function smallNode(key,label,cls){
     +'<text x="'+(x+p.w/2)+'" y="'+(p.y+3)+'" text-anchor="middle" style="font-size:'+(p.h<24?8:9)+'px">'+label+'</text></g>';
 }
 function draw(){
+  { const mb=document.getElementById("mmMec"); if(mb) mb.classList.toggle("on",mode==="mec"); }
+  if(mode==="mec") return drawMec();
   computeStatus(); layout(); LINKS=buildLinks();
   const T=trace(), has=!!sel;
   let s='<text class="mm-colhead" x="'+LVX+'" y="18">LVSB (INPUT)</text><text class="mm-colhead" x="'+PXX+'" y="18">PIU/MTS</text><text class="mm-colhead" x="'+UX+'" y="18">UPS</text><text class="mm-colhead" x="'+MX+'" y="18">MDP · UPS-SERVING STS PANEL ('+(side==="A"?"GA":"GB")+')</text>'
@@ -7650,6 +7655,7 @@ function mdpInputRow(mid){
   return set.length?'<div class="mm-row"><b>Input from</b>'+set.map(l=>chip("L",l,l+" ("+lvById(l).loc+")")).join("")+'</div>':"";
 }
 function drawCard(){
+  if(mode==="mec") return mecCard();
   const c=document.getElementById("mmCard");
   if(!sel){
     const unv=bySide(STS).filter(s=>!stsSrc(s).ok).length, tot=bySide(STS).length;
@@ -7678,6 +7684,7 @@ function drawCard(){
     const sts=[...new Set(mids.flatMap(m=>stsOfMdp(m).map(s=>s.id)))];
     const cr=bySide(CRAC).filter(c=>c.lvsb===lv.id);
     h+='<h3>'+esc(lv.id)+'</h3><div class="sub">Low-voltage switchboard · '+esc(lv.loc)+(ups.length?' · feeds '+ups.length+' UPS through PIUs':'')+(cr.length?' · feeds '+cr.length+' CRAC panel'+(cr.length>1?'s':''):'')+'</div>';
+    { const up=mecUp(lv.id); if(up) h+='<div class="mm-row"><b>Upstream (MEC)</b>'+mchip("MX:"+up.tx.id,up.tx.id)+mchip("MB:"+up.mvsb.id,"MVSB "+up.mvsb.id)+up.vaults.map(v=>mchip("MV:"+v.id,v.name,v.col==="B"?"s2":"")).join("")+'<button type="button" class="btn ghost" data-act="tomec" data-id="'+esc(lv.id)+'">View in MEC ▸</button></div>'; }
     if(ups.length){
       h+='<div class="mm-row"><b>Feeds UPS</b>'+ups.map(u=>chip("U",u.id,u.id+(INP[u.id].mts?" · MTS":""),INP[u.id].mts?"s2":"")).join("")+'</div>';
       h+='<div class="mm-row"><b>Then MDP</b>'+mids.map(m=>mdpChips(m)).join("")+'</div>';
@@ -7771,7 +7778,7 @@ function build(){
     +'<optgroup label="CRAC panels">'+CRAC.map(c=>'<option value="C:'+c.id+'">'+c.side+' · '+c.name+' ('+c.tag+')</option>').join("")+'</optgroup>'
     +'<optgroup label="Data center / access">'+DC.map(d=>'<option value="D:'+d.id+'">'+d.side+' · '+d.name+'</option>').join("")+'</optgroup>';
   o.innerHTML='<div class="mm-head"><h2><span style="color:var(--amber)">⚡</span> Power-Path Mimic</h2>'
-    +'<button class="btn ghost mm-side" data-side="A">A-SIDE</button><button class="btn ghost mm-side" data-side="B">B-SIDE</button>'
+    +'<button class="btn ghost mm-side" data-side="A">A-SIDE</button><button class="btn ghost mm-side" data-side="B">B-SIDE</button><button class="btn ghost" id="mmMec" title="Substation: Vault → MVSB → TX → LVSB">MEC</button>'
     +'<select id="mmJump">'+opts+'</select>'
     +'<button class="btn ghost" id="mmZm" title="Zoom out">–</button><button class="btn ghost" id="mmZp" title="Zoom in">+</button>'
     +'<button class="btn ghost" id="mmClr">Clear</button><button class="btn primary" id="mmX">✕ Close</button></div>'
@@ -7785,19 +7792,22 @@ function build(){
       if(n-lt<340&&Math.abs(e.clientX-lx)<30&&Math.abs(e.clientY-ly)<30){ lt=0; toggleFull(); } else { lt=n; lx=e.clientX; ly=e.clientY; } });
     document.addEventListener("fullscreenchange",()=>{ if(!document.fullscreenElement&&o.classList.contains("mm-full")) setFull(false,true); });
   })();
-  o.querySelectorAll(".mm-side").forEach(b=>b.onclick=()=>{ side=b.dataset.side; sel=null; editing=false; $("mmJump").value=""; draw(); $("mmWrap").scrollTo({left:0,top:0}); });
-  $("mmClr").onclick=()=>{ sel=null; editing=false; $("mmJump").value=""; draw(); };
+  o.querySelectorAll(".mm-side").forEach(b=>b.onclick=()=>{ side=b.dataset.side; sel=null; msel=null; editing=false; $("mmJump").value=""; draw(); $("mmWrap").scrollTo({left:0,top:0}); });
+  $("mmClr").onclick=()=>{ sel=null; msel=null; editing=false; $("mmJump").value=""; draw(); };
+  $("mmMec").onclick=()=>{ mode=mode==="mec"?"path":"mec"; sel=null; msel=null; editing=false; $("mmJump").value=""; draw(); $("mmWrap").scrollTo({left:0,top:0}); };
   $("mmZp").onclick=()=>{ zoom=Math.min(1600,zoom+140); draw(); };
   $("mmZm").onclick=()=>{ zoom=Math.max(560,zoom-140); draw(); };
   $("mmJump").onchange=e=>{ if(e.target.value) pick(e.target.value); };
   $("mmSvg").addEventListener("click",e=>{
     const g=e.target.closest(".mm-node");
-    if(g){ pick(g.getAttribute("data-key")); } else { sel=null; editing=false; $("mmJump").value=""; draw(); }
+    if(g){ pick(g.getAttribute("data-key")); } else { sel=null; msel=null; editing=false; $("mmJump").value=""; draw(); }
   });
   const card=$("mmCard");
   card.addEventListener("click",e=>{
     const go=e.target.closest("[data-go]"); if(go){ pick(go.getAttribute("data-go")); return; }
     const act=e.target.closest("[data-act]"); if(!act) return;
+    if(act.dataset.act==="topath"){ mode="path"; msel=null; pick("L:"+act.dataset.id); return; }
+    if(act.dataset.act==="tomec"){ mecPick("ML:"+act.dataset.id); return; }
     if(act.dataset.act==="edit"){ editing=!editing; drawCard(); }
     if(act.dataset.act==="reset"){ if(sel.t==="U") delete ov.ups[sel.id]; if(sel.t==="S") delete ov.sts[sel.id]; saveOv(); draw(); }
   });
@@ -7810,6 +7820,8 @@ function build(){
   document.addEventListener("keydown",e=>{ if(e.key==="Escape"&&o.classList.contains("open")) close(); });
 }
 function pick(key){
+  if(/^M[VBXL]:/.test(key)) return mecPick(key);
+  if(mode==="mec"){ if(key.slice(0,2)==="L:") return mecPick("ML:"+key.slice(2)); mode="path"; msel=null; }
   let t=key.charAt(0), id=key.slice(2);
   if(t==="P"||t==="T"){ t="U"; id=id.split(":")[0]; key="U:"+id; }
   const item=(t==="U"?UPS:t==="M"?MDP:t==="S"?STS:t==="L"?LVSB:t==="C"?CRAC:t==="G"?GROUPS:DC).find(x=>x.id===id);
@@ -7824,7 +7836,7 @@ function open(name){
   build();
   document.getElementById("mimicOverlay").classList.add("open");
   document.body.style.overflow="hidden";
-  sel=null; editing=false;
+  sel=null; editing=false; mode="path"; msel=null;
   const n=norm(legacy(name));
   if(n){
     const u=UPS.find(x=>norm(x.id)===n), s=STS.find(x=>norm(x.id)===n), lv=LVSB.find(x=>norm(x.id)===n);
@@ -7855,6 +7867,176 @@ function importOv(o){   // merge a backup's edits; never wipe ours
   Object.assign(ov.ups,o.ups||{});
   Object.keys(o.sts||{}).forEach(k=>{ ov.sts[k]=Object.assign({},o.sts[k],ov.sts[k]||{}); });
   saveOv();
+}
+
+/* =========================================================
+   MEC — substation view (V11_37)
+   Source: "Okada Manila Substation Single Line Diagram of Podium A / Podium B".
+   Vault room → MVSB (34.5 kV switchboard) → TX (transformer) → LVSB.
+   red / blue = the two normal 34.5 kV feeders, dashed = 400 V feeder to the LVSB,
+   green E = emergency (generator) feeder. Only transformers that feed an LVSB are drawn.
+   ========================================================= */
+const MEC_V=[
+  {id:"V1",side:"A",name:"Vault Room #1",sin:"457-890-270-102",col:"R"},
+  {id:"V4",side:"A",name:"Vault Room #4",sin:"457-198-140-102",col:"B"},
+  {id:"V2",side:"B",name:"Vault Room #2",sin:"457-892-450-103",col:"R",note:"On the drawing, the red wire leaves Vault Room #2 but the legend says red = Vault Room 3. Wiring followed here — please verify."},
+  {id:"V3",side:"B",name:"Vault Room #3",sin:"457-892-880-103",col:"B",note:"On the drawing, the blue wire leaves Vault Room #3 but the legend says blue = Vault Room 2. Wiring followed here — please verify."}
+];
+const MEC_B=[   // from: [upstream node, feeder colour]
+  {id:"A2-03-01",mec:"MEC-A2",side:"A",from:[["V1","R"]],em:"RMU A2-GENSET-02 (ATS-4)"},
+  {id:"A2-03-02",mec:"MEC-A2",side:"A",from:[["A2-03-01","R"]],em:"RMU A2-GENSET-02"},
+  {id:"A1-12-01",mec:"MEC-A1",side:"A",from:[["A2-03-01","R"],["A3-04-01","B"]],em:"RMU A1-GENSET-01"},
+  {id:"A3-04-03",mec:"MEC-A3",side:"A",from:[["V4","B"]],em:"RMU A3-GENSET-03 (ATS-3)"},
+  {id:"A3-04-01",mec:"MEC-A3",side:"A",from:[["A3-04-03","B"]],em:"RMU A3-GENSET-03"},
+  {id:"B3-04-01",mec:"MEC-B3",side:"B",from:[["V2","R"]],em:"RMU B2-GENSET-02 (ATS-2)"},
+  {id:"B1-12-01",mec:"MEC-B1",side:"B",from:[["B3-04-01","R"]],em:"RMU B1-GENSET-01"},
+  {id:"B1-WF-03",mec:"MEC-B1",side:"B",from:[["B1-12-01","R"]],em:"RMU B1-GENSET-01"},
+  {id:"B2-03-01",mec:"MEC-B2",side:"B",from:[["B3-04-01","R"]],em:"RMU B2-GENSET-01"},
+  {id:"B2-03-02",mec:"MEC-B2",side:"B",from:[["B2-03-01","R"]],em:"RMU B2-GENSET-01"},
+  {id:"B3-MC-02",mec:"MEC-B3",side:"B",from:[["V3","B"]],em:"RMU B2-GENSET-02 (ATS-1)"},
+  {id:"B1-MC-02",mec:"MEC-B1",side:"B",from:[["B3-MC-02","B"]],em:"RMU B1-GENSET-01"}
+];
+const MEC_X=[["TX-2A","A1-12-01","R"],["TX-1A","A1-12-01","B"],["TX-5A","A1-12-01","R"],["TX-6A","A1-12-01","B"],["TX-3A","A1-12-01","R"],["TX-4A","A1-12-01","B"],["TX-8A","A1-12-01","R"],["TX-7A","A1-12-01","B"],
+  ["TX-13A","A2-03-01","R"],["TX-9A","A2-03-01","R"],["TX-12A","A2-03-01","R"],["TX-10A","A2-03-02","R"],["TX-11A","A2-03-02","R"],
+  ["TX-16A","A3-04-03","B"],["TX-15A","A3-04-01","B"],["TX-17A","A3-04-01","B"],
+  ["TX-10B","B1-WF-03","R"],["TX-2B","B1-WF-03","R"],["TX-4B","B1-WF-03","R"],["TX-9B","B1-12-01","R"],["TX-1B","B1-12-01","R"],["TX-3B","B1-12-01","R"],["TX-8B","B1-12-01","R"],["TX-6B","B1-12-01","R"],
+  ["TX-7B","B1-MC-02","B"],["TX-5B","B1-MC-02","B"],
+  ["TX-13B","B2-03-02","R"],["TX-17B","B2-03-02","R"],["TX-11B","B2-03-02","R"],["TX-15B","B2-03-02","R"],["TX-16B","B2-03-01","R"],["TX-12B","B2-03-01","R"],["TX-14B","B2-03-01","R"],
+  ["TX-19B","B3-MC-02","B"],["TX-18B","B3-04-01","R"],["TX-21B","B3-04-01","R"],["TX-20B","B3-04-01","R"]
+].map(r=>({id:r[0],mvsb:r[1],col:r[2],lvsb:"LVSB-"+r[0].slice(3)}));
+const MEC_ORDER={
+  A:["TX-2A","TX-1A","TX-5A","TX-6A","TX-3A","TX-4A","TX-8A","TX-7A","TX-13A","TX-9A","TX-10A","TX-12A","TX-11A","TX-16A","TX-15A","TX-17A"],
+  B:["TX-10B","TX-9B","TX-2B","TX-1B","TX-4B","TX-3B","TX-8B","TX-7B","TX-5B","TX-6B","TX-13B","TX-17B","TX-16B","TX-11B","TX-12B","TX-14B","TX-15B","TX-19B","TX-18B","TX-21B","TX-20B"]
+};
+const MEC_TIES=[["2A","1A"],["5A","6A"],["3A","4A"],["8A","7A"],["9A","10A"],["12A","11A"],["16A","15A"],["10B","9B"],["2B","1B"],["4B","3B"],["8B","7B"],["5B","6B"],["17B","16B"],["11B","12B"],["14B","15B"],["19B","18B"],["18B","21B"]].map(p=>["LVSB-"+p[0],"LVSB-"+p[1]]);
+const mxOf=tx=>MEC_X.find(x=>x.id===tx), mbOf=id=>MEC_B.find(b=>b.id===id), mvOf=id=>MEC_V.find(v=>v.id===id);
+const mecTxOfLv=lid=>MEC_X.find(x=>x.lvsb===lid);
+const tieOf=lid=>MEC_TIES.filter(p=>p.includes(lid)).map(p=>p[0]===lid?p[1]:p[0]);
+const mCol=c=>c==="B"?"#4FC3F7":"#FF5D6C", mColName=c=>c==="B"?"blue":"red";
+const mchip=(key,label,extra)=>'<button type="button" class="mm-chip '+(extra||"")+'" data-go="'+esc(key)+'">'+esc(label)+'</button>';
+/* all upstream nodes of an MVSB along one feeder colour (col omitted = every feeder) */
+function mecParents(mid,col){ const b=mbOf(mid); if(!b) return []; const f=b.from.filter(p=>!col||p[1]===col); return (f.length?f:b.from); }
+function mecUp(lid){
+  const x=mecTxOfLv(lid); if(!x) return null; const vaults=[]; const seen=new Set();
+  const walk=(mid,col)=>{ mecParents(mid,col).forEach(p=>{ const v=mvOf(p[0]); if(v){ if(!seen.has(v.id)){ seen.add(v.id); vaults.push(v); } } else walk(p[0],col); }); };
+  walk(x.mvsb,x.col); return {tx:x, mvsb:mbOf(x.mvsb), vaults};
+}
+const MEC_POS={}; let MEC_LINKS=[];
+function mecLayout(){
+  Object.keys(MEC_POS).forEach(k=>delete MEC_POS[k]); MEC_LINKS=[];
+  const SIDE=side, bs=MEC_B.filter(b=>b.side===SIDE), vs=MEC_V.filter(v=>v.side===SIDE), order=MEC_ORDER[SIDE].map(mxOf), RH=32, TOP=64;
+  // depth of every MVSB = longest chain from a vault
+  const depth={}; const dOf=id=>{ if(depth[id]!==undefined) return depth[id]; const b=mbOf(id); depth[id]=1+Math.max(...b.from.map(p=>mvOf(p[0])?0:dOf(p[0]))); return depth[id]; };
+  bs.forEach(b=>dOf(b.id)); const maxD=Math.max(...bs.map(b=>depth[b.id]));
+  const VX=10,VW=118, MW=128, GAP=34, MX0=VX+VW+GAP, TXX=MX0+maxD*(MW+GAP), TXW=64, LX=TXX+TXW+GAP, LW=92;
+  // rows: TX + LVSB share a y; a little extra space between MEC groups
+  let y=TOP, lastMec=null; const rowY={};
+  order.forEach(x=>{ const mec=mbOf(x.mvsb).mec; if(lastMec&&mec!==lastMec) y+=16; lastMec=mec; rowY[x.id]=y; y+=RH; });
+  order.forEach(x=>{ MEC_POS["MX:"+x.id]={x:TXX,y:rowY[x.id],w:TXW,h:26}; MEC_POS["ML:"+x.lvsb]={x:LX,y:rowY[x.id],w:LW,h:26}; });
+  // MVSB y = centre of what it feeds; keep the nodes of a column apart
+  const kids=id=>[].concat(order.filter(x=>x.mvsb===id).map(x=>rowY[x.id]), bs.filter(b=>b.from.some(p=>p[0]===id)).map(b=>MEC_POS["MB:"+b.id]?MEC_POS["MB:"+b.id].y:null).filter(v=>v!==null));
+  for(let d=maxD; d>=1; d--){
+    const col=bs.filter(b=>depth[b.id]===d).map(b=>({b,y:0}));
+    col.forEach(o=>{ const k=kids(o.b.id); o.y=k.length?k.reduce((a,c)=>a+c,0)/k.length:TOP; });
+    col.sort((a,c)=>a.y-c.y); col.forEach((o,i)=>{ if(i&&o.y<col[i-1].y+54) o.y=col[i-1].y+54; MEC_POS["MB:"+o.b.id]={x:MX0+(d-1)*(MW+GAP),y:o.y,w:MW,h:44}; });
+  }
+  const vcol=vs.map(v=>{ const k=bs.filter(b=>b.from.some(p=>p[0]===v.id)).map(b=>MEC_POS["MB:"+b.id].y); return {v,y:k.reduce((a,c)=>a+c,0)/Math.max(1,k.length)}; }).sort((a,c)=>a.y-c.y);
+  vcol.forEach((o,i)=>{ if(i&&o.y<vcol[i-1].y+56) o.y=vcol[i-1].y+56; MEC_POS["MV:"+o.v.id]={x:VX,y:o.y,w:VW,h:44}; });
+  // links
+  bs.forEach(b=>b.from.forEach(p=>MEC_LINKS.push({from:(mvOf(p[0])?"MV:":"MB:")+p[0],to:"MB:"+b.id,col:p[1]})));
+  order.forEach(x=>{ MEC_LINKS.push({from:"MB:"+x.mvsb,to:"MX:"+x.id,col:x.col}); MEC_LINKS.push({from:"MX:"+x.id,to:"ML:"+x.lvsb,col:x.col,dash:true}); });
+  const Hh=Math.max(y,...Object.values(MEC_POS).map(p=>p.y+p.h/2))+30;
+  return {W2:LX+LW+70,H2:Hh,cols:{VX,MX0,MW,GAP,TXX,LX,maxD},order,rowY};
+}
+function mecTrace(){
+  const nodes=new Set(), on=new Set(); if(!msel) return {nodes,on,any:false};
+  const k0="M"+msel.t+":"+msel.id;
+  const up=(k,col)=>{ nodes.add(k); MEC_LINKS.forEach((l,i)=>{ if(l.to!==k) return;
+    if(k.startsWith("MB:")){ const par=mecParents(k.slice(3),col); if(!par.some(p=>((mvOf(p[0])?"MV:":"MB:")+p[0])===l.from&&p[1]===l.col)) return; }
+    on.add(i); up(l.from,col); }); };
+  const down=(k,col)=>{ nodes.add(k); MEC_LINKS.forEach((l,i)=>{ if(l.from!==k) return; if(col&&l.col!==col) return; on.add(i); down(l.to,col); }); };
+  if(msel.t==="L"){ const x=mecTxOfLv(msel.id); if(x){ up("MX:"+x.id,x.col); down("MX:"+x.id,x.col); } nodes.add(k0); }
+  else if(msel.t==="X"){ const x=mxOf(msel.id); up("MX:"+x.id,x.col); down("MX:"+x.id,x.col); }
+  else if(msel.t==="B"){ up(k0); down(k0); }
+  else { const v=mvOf(msel.id); down(k0,v.col); }
+  return {nodes,on,any:true};
+}
+function drawMec(){
+  const Ly=mecLayout(); Object.keys(MEC_POS).forEach(k=>{ POS[k]=MEC_POS[k]; });
+  const T=mecTrace(), c=Ly.cols; let s="";
+  s+='<text class="mm-colhead" x="'+c.VX+'" y="18">VAULT ROOM</text><text class="mm-colhead" x="'+c.MX0+'" y="18">MVSB · 34.5 kV</text><text class="mm-colhead" x="'+c.TXX+'" y="18">TX</text><text class="mm-colhead" x="'+c.LX+'" y="18">LVSB</text>';
+  const curve=(a,b)=>{ const x1=a.x+a.w, y1=a.y, x2=b.x, y2=b.y, xm=(x1+x2)/2; return "M"+x1+" "+y1+" C"+xm+" "+y1+","+xm+" "+y2+","+x2+" "+y2; };
+  let g="",dots="";
+  MEC_LINKS.forEach((l,i)=>{ const a=MEC_POS[l.from], b=MEC_POS[l.to]; if(!a||!b) return; const isOn=T.on.has(i), d=curve(a,b), col=mCol(l.col);
+    g+='<path class="mm-link'+(isOn?" on":T.any?" off":"")+'" d="'+d+'" stroke="'+col+'"'+(l.dash&&!isOn?' stroke-dasharray="5 4"':'')+'/>';
+    if(isOn) dots+='<circle class="mm-dot" r="3.6" fill="'+col+'" style="color:'+col+'"><animateMotion dur="'+(l.dash?"0.9":"1.6")+'s" repeatCount="indefinite" path="'+d+'"/></circle>'; });
+  // TIE brackets between neighbouring LVSBs
+  let ties=""; MEC_TIES.forEach(p=>{ const a=MEC_POS["ML:"+p[0]], b=MEC_POS["ML:"+p[1]]; if(!a||!b) return; const x=a.x+a.w+8, y1=Math.min(a.y,b.y), y2=Math.max(a.y,b.y);
+    ties+='<path d="M'+(a.x+a.w)+' '+a.y+' H'+x+' V'+b.y+' H'+(b.x+b.w)+'" fill="none" stroke="var(--text-faint)" stroke-width="1.2" stroke-dasharray="3 3"/><text x="'+(x+3)+'" y="'+((y1+y2)/2+3)+'" style="font:600 8px var(--font-mono);fill:var(--text-faint)">TIE</text>'; });
+  s+=g+dots+ties;
+  const cls=k=>(msel&&("M"+msel.t+":"+msel.id)===k)?"sel on":T.nodes.has(k)?"on":T.any?"dim":"";
+  MEC_V.filter(v=>v.side===side).forEach(v=>{ s+=nodeSvg("MV:"+v.id,cls("MV:"+v.id),[v.name,"SIN "+v.sin]); });
+  MEC_B.filter(b=>b.side===side).forEach(b=>{ s+=nodeSvg("MB:"+b.id,cls("MB:"+b.id),["MVSB "+b.id,b.mec,"E ← "+b.em.replace("RMU ","").replace(/ \(.*\)/,"")]); });
+  const inMimic=id=>LVSB.some(l=>l.id===id);
+  MEC_ORDER[side].map(mxOf).forEach(x=>{ s+=nodeSvg("MX:"+x.id,cls("MX:"+x.id),[x.id]);
+    s+=nodeSvg("ML:"+x.lvsb,(cls("ML:"+x.lvsb)+(inMimic(x.lvsb)?"":" ext")).trim(),[x.lvsb]); });
+  // MEC group labels on the right
+  { let cur=null, y0=0; const lab=(m,ya,yb)=>{ s+='<text class="mm-colhead" x="'+(Ly.W2-62)+'" y="'+((ya+yb)/2+4)+'" style="fill:var(--amber)">'+m+'</text>'; };
+    MEC_ORDER[side].map(mxOf).forEach((x,i,arr)=>{ const m=mbOf(x.mvsb).mec, y=Ly.rowY[x.id]; if(m!==cur){ if(cur) lab(cur,y0,Ly.rowY[arr[i-1].id]); cur=m; y0=y; } if(i===arr.length-1) lab(cur,y0,y); }); }
+  const svg=document.getElementById("mmSvg");
+  svg.setAttribute("viewBox","0 0 "+Ly.W2+" "+Ly.H2); svg.innerHTML=s; svg.style.width=Math.round(zoom*Ly.W2/W)+"px";
+  document.querySelectorAll(".mm-side").forEach(b=>b.classList.toggle("on",b.dataset.side===side));
+  drawCard();
+}
+function mecPick(key){
+  mode="mec"; const t=key.charAt(1), id=key.slice(3);
+  const it=t==="V"?mvOf(id):t==="B"?mbOf(id):t==="X"?mxOf(id):null, lv=t==="L"?LVSB.find(l=>l.id===id)||MEC_X.find(x=>x.lvsb===id):null;
+  const sd=t==="V"?(it&&it.side):t==="B"?(it&&it.side):t==="X"?(id.slice(-1)):(id.slice(-1));
+  if(sd==="A"||sd==="B") side=sd;
+  msel={t,id}; sel=null; editing=false;
+  const j=document.getElementById("mmJump"); if(j) j.value="";
+  draw();
+  const p=MEC_POS[key], wrap=document.getElementById("mmWrap");
+  if(p&&wrap){ const sc=zoom/W; wrap.scrollTo({left:Math.max(0,(p.x+p.w/2)*sc-wrap.clientWidth/2),top:Math.max(0,p.y*sc-wrap.clientHeight/2),behavior:"smooth"}); }
+}
+function mecCard(){
+  const c=document.getElementById("mmCard"); let h="";
+  const colLine=cl=>'<span style="color:'+mCol(cl)+'">'+mColName(cl)+'</span>';
+  const vName=cl=>{ const v=MEC_V.find(z=>z.side===side&&z.col===cl); return v?v.name:""; };
+  if(!msel){
+    h+='<h3>MEC · '+(side==="A"?"Group-A (Podium A)":"Group-B (Podium B)")+' substation · tap any node</h3>'
+      +'<div class="sub">Vault room → MVSB (34.5 kV switchboard) → TX (transformer) → LVSB. The path of the selected node animates. Solid line = 34.5 kV feeder, dashed = 400 V feeder to the LVSB. Greyed LVSBs are not on the UPS power-path diagram. Each MVSB also has an emergency “E” feeder from the generator RMU.</div>'
+      +'<div class="mm-legend"><span style="color:#FF5D6C">━ red feeder = '+esc(vName("R"))+'</span><span style="color:#4FC3F7">━ blue feeder = '+esc(vName("B"))+'</span></div>';
+    if(side==="B") h+='<div class="mm-row"><span class="mm-pill warn">The drawing legend labels red as Vault Room 3 and blue as Vault Room 2, but the wires leave Vault #2 (red) and #3 (blue). Wiring followed — please verify.</span></div>';
+    c.innerHTML=h; return;
+  }
+  const t=msel.t, id=msel.id;
+  if(t==="V"){ const v=mvOf(id), ch=MEC_B.filter(b=>b.from.some(p=>p[0]===id));
+    h+='<h3>'+esc(v.name)+'</h3><div class="sub">SIN '+esc(v.sin)+' · normal 34.5 kV feeder ('+colLine(v.col)+' on the drawing)</div>';
+    h+='<div class="mm-row"><b>Feeds MVSB</b>'+ch.map(b=>mchip("MB:"+b.id,"MVSB "+b.id+" ("+b.mec+")")).join("")+'</div>';
+    if(v.note) h+='<div class="mm-row"><span class="mm-pill warn">'+esc(v.note)+'</span></div>';
+  } else if(t==="B"){ const b=mbOf(id), tx=MEC_X.filter(x=>x.mvsb===id), kids=MEC_B.filter(z=>z.from.some(p=>p[0]===id));
+    h+='<h3>MVSB '+esc(b.id)+'</h3><div class="sub">'+esc(b.mec)+' · medium-voltage switchboard</div>';
+    h+='<div class="mm-row"><b>Normal source</b>'+b.from.map(p=>{ const v=mvOf(p[0]); return mchip((v?"MV:":"MB:")+p[0],(v?v.name:"MVSB "+p[0])+" · "+mColName(p[1]),p[1]==="B"?"s2":""); }).join("")+'</div>';
+    h+='<div class="mm-row"><b>Emergency (E)</b><span style="color:var(--green)">'+esc(b.em)+'</span></div>';
+    if(kids.length) h+='<div class="mm-row"><b>Feeds MVSB</b>'+kids.map(z=>mchip("MB:"+z.id,"MVSB "+z.id)).join("")+'</div>';
+    h+='<div class="mm-row"><b>Feeds TX</b>'+(tx.length?tx.map(x=>mchip("MX:"+x.id,x.id+" · "+mColName(x.col),x.col==="B"?"s2":"")).join(""):"—")+'</div>';
+  } else if(t==="X"){ const x=mxOf(id), up=mecUp(x.lvsb);
+    h+='<h3>'+esc(x.id)+'</h3><div class="sub">34.5 kV / 400 V transformer · feeder '+colLine(x.col)+'</div>';
+    h+='<div class="mm-row"><b>Fed from MVSB</b>'+mchip("MB:"+x.mvsb,"MVSB "+x.mvsb+" ("+mbOf(x.mvsb).mec+")")+'</div>';
+    if(up) h+='<div class="mm-row"><b>Source</b>'+up.vaults.map(v=>mchip("MV:"+v.id,v.name)).join("")+'</div>';
+    h+='<div class="mm-row"><b>Feeds LVSB</b>'+mchip("ML:"+x.lvsb,x.lvsb)+'</div>';
+  } else {
+    const x=mecTxOfLv(id), up=mecUp(id), inM=LVSB.find(l=>l.id===id), ties=tieOf(id);
+    const ups=inM?UPS.filter(u=>INP[u.id]&&INP[u.id].src.includes(id)):[], cr=inM?CRAC.filter(z=>z.lvsb===id):[];
+    h+='<h3>'+esc(id)+'</h3><div class="sub">Low-voltage switchboard · '+(inM?esc(inM.loc):"not on the UPS power-path diagram")+'</div>';
+    if(x) h+='<div class="mm-row"><b>Fed by</b>'+mchip("MX:"+x.id,x.id)+mchip("MB:"+x.mvsb,"MVSB "+x.mvsb)+(up?up.vaults.map(v=>mchip("MV:"+v.id,v.name,v.col==="B"?"s2":"")).join(""):"")+'</div>';
+    if(ties.length) h+='<div class="mm-row"><b>TIE with</b>'+ties.map(z=>mchip("ML:"+z,z)).join("")+'</div>';
+    if(ups.length) h+='<div class="mm-row"><b>Feeds UPS</b>'+ups.map(u=>'<span class="mm-chip" style="cursor:default">'+esc(u.id)+'</span>').join("")+'</div>';
+    if(cr.length) h+='<div class="mm-row"><b>Feeds CRAC</b>'+cr.map(z=>'<span class="mm-chip" style="cursor:default">'+esc(z.name+" ("+z.tag+")")+'</span>').join("")+'</div>';
+    if(inM) h+='<div class="mm-row"><button type="button" class="btn ghost" data-act="topath" data-id="'+esc(id)+'">Show in power path ▸</button></div>';
+  }
+  c.innerHTML=h;
 }
 window.MIMIC={open,close,exportOv,importOv};
 })();
